@@ -1,9 +1,9 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+// import 'dart:convert';
+// import 'package:http/http.dart' as http;
 import '../models/news.dart';
 
 class NewsService {
-  static const String _baseUrl = 'https://api.example.com'; // Thay đổi thành URL backend thực tế
+  // static const String _baseUrl = 'https://api.example.com'; // Thay đổi thành URL backend thực tế
   
   // Mock data for testing - replace with real API call later
   Future<List<News>> getNews() async {

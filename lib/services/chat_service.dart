@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+// import 'dart:convert';
+// import 'package:http/http.dart' as http;
 
 class ChatService {
-  static const String _baseUrl = 'https://api.example.com'; // Thay đổi URL này thành API backend thực tế
+  // static const String _baseUrl = 'https://api.example.com'; // Thay đổi URL này thành API backend thực tế
   
   // Simulate API call for now - replace with real implementation later
   Future<String> sendMessage(String message) async {

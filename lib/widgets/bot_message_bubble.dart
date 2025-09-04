@@ -107,7 +107,7 @@ class BotMessageBubble extends StatelessWidget {
           fontSize: 16.0,
           height: 1.4,
         ),
-        strong: TextStyle(
+        strong: const TextStyle(
           color: Colors.black87,
           fontSize: 16.0,
           fontWeight: FontWeight.bold,

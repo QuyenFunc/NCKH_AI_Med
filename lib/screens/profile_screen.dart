@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
+import '../models/user.dart';
+import '../models/user_profile.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -8,6 +12,39 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  User? get currentUser => AuthService.instance.currentUser;
+  UserProfile? get currentProfile => AuthService.instance.currentProfile;
+
+  Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Đăng xuất'),
+        content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Đăng xuất'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await AuthService.instance.logout();
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -24,10 +61,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings, color: Colors.black87),
-            onPressed: () {
-              // TODO: Navigate to settings
-            },
+            icon: const Icon(Icons.logout, color: Colors.black87),
+            onPressed: _logout,
           ),
         ],
       ),
@@ -73,9 +108,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 16.0),
                   
                   // Name
-                  const Text(
-                    'Người dùng',
-                    style: TextStyle(
+                  Text(
+                    currentUser?.name ?? currentUser?.email.split('@')[0] ?? 'Người dùng',
+                    style: const TextStyle(
                       fontSize: 20.0,
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
@@ -85,7 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   
                   // Email
                   Text(
-                    'user@example.com',
+                    currentUser?.email ?? 'Chưa đăng nhập',
                     style: TextStyle(
                       fontSize: 14.0,
                       color: Colors.grey.shade600,
@@ -117,14 +152,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             
             const SizedBox(height: 24.0),
             
-            // Health Stats (Coming Soon)
+            // Health Stats
             _buildSectionCard(
-              title: 'Thống kê sức khỏe',
+              title: 'Thông tin sức khỏe',
               icon: Icons.bar_chart,
               items: [
-                _buildStatItem('Số lần chẩn đoán', '0', Icons.healing),
-                _buildStatItem('Bài viết đã đọc', '0', Icons.article),
-                _buildStatItem('Ngày sử dụng', '1 ngày', Icons.calendar_today),
+                _buildStatItem('Tuổi', currentProfile?.age?.toString() ?? 'Chưa cập nhật', Icons.cake),
+                _buildStatItem('Giới tính', currentProfile?.genderDisplay ?? 'Chưa cập nhật', Icons.person),
+                _buildStatItem('Tỉnh/Thành', currentProfile?.province ?? 'Chưa cập nhật', Icons.location_on),
+                _buildStatItem('Hút thuốc', currentProfile?.smokingDisplay ?? 'Chưa cập nhật', Icons.smoke_free),
+                _buildStatItem('Rượu bia', currentProfile?.drinkingDisplay ?? 'Chưa cập nhật', Icons.local_drink),
               ],
             ),
             

@@ -41,7 +41,7 @@ class _NewsScreenState extends State<NewsScreen> {
     super.dispose();
   }
 
-  void _loadNews() async {
+  Future<void> _loadNews() async {
     setState(() {
       _isLoading = true;
     });

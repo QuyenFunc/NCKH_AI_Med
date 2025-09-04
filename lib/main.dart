@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'screens/main_screen.dart';
+import 'screens/login_screen.dart';
+import 'services/auth_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AuthService.instance.initialize();
   runApp(const Dia5App());
 }
 
@@ -75,7 +79,9 @@ class Dia5App extends StatelessWidget {
           ),
         ),
       ),
-      home: const MainScreen(),
+      home: AuthService.instance.isLoggedIn 
+        ? const MainScreen() 
+        : const LoginScreen(),
     );
   }
 }
