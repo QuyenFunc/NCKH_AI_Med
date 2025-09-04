@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/chat_screen.dart';
+import 'screens/main_screen.dart';
 
 void main() {
   runApp(const Dia5App());
@@ -75,7 +75,7 @@ class Dia5App extends StatelessWidget {
           ),
         ),
       ),
-      home: const ChatScreen(),
+      home: const MainScreen(),
     );
   }
 }

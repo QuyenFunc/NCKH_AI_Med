@@ -43,6 +43,21 @@ dependencies:
   
   # For state management
   provider: ^6.1.2
+  
+  # For opening URLs in browser
+  url_launcher: ^6.3.1
+  
+  # For caching images
+  cached_network_image: ^3.4.1
+  
+  # For date formatting
+  intl: ^0.19.0
+  
+  # For authentication and form validation
+  shared_preferences: ^2.3.3
+  
+  # For MySQL database connection (through REST API)
+  json_annotation: ^4.9.0
 
 dev_dependencies:
   flutter_test:
