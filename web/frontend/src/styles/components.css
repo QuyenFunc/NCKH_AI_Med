@@ -1,0 +1,15 @@
+/* Component styles và animations */
+@layer components {
+  /* Custom component styles */
+  .chat-message {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  .typing-indicator {
+    animation: typing 1s infinite;
+  }
+  
+  .scroll-smooth {
+    scroll-behavior: smooth;
+  }
+}

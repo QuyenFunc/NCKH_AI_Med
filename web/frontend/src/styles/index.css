@@ -1,0 +1,13 @@
+/* Main styles entry point */
+/* Import tất cả styles theo thứ tự ưu tiên */
+
+/* 1. Global styles và Tailwind (phải đầu tiên) */
+@import './global.css';
+
+/* 2. Component styles */
+@import './components.css';
+
+/* 3. Feature-specific styles */
+@import './scrollbar.css';
+@import './message.css';
+@import './alerts.css';
