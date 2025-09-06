@@ -1,0 +1,25 @@
+/* Emergency/Warning message styling */
+.emergency-message {
+  border-left: 4px solid rgb(239 68 68); /* red-500 */
+  background-color: rgb(254 242 242); /* red-50 */
+  padding: 1rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+  animation: pulse 2s infinite;
+}
+
+.warning-message {
+  border-left: 4px solid rgb(234 179 8); /* yellow-500 */
+  background-color: rgb(254 252 232); /* yellow-50 */
+  padding: 1rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .emergency-message {
+    background-color: rgba(127 29 29, 0.2); /* red-900/20 */
+  }
+  
+  .warning-message {
+    background-color: rgba(113 63 18, 0.2); /* yellow-900/20 */
+  }
+}

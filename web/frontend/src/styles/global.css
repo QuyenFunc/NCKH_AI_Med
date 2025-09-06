@@ -1,0 +1,17 @@
+/* Global base styles và Tailwind imports */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: rgb(226 232 240); /* slate-200 */
+  }
+  
+  body {
+    background-color: white;
+    color: rgb(15 23 42); /* slate-900 */
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
