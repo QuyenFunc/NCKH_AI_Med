@@ -7,9 +7,11 @@ import com.nckh.dia5.handler.ResourceNotFoundException;
 import com.nckh.dia5.model.Province;
 import com.nckh.dia5.model.User;
 import com.nckh.dia5.model.UserDemographic;
+import com.nckh.dia5.model.UserLifestyle;
 import com.nckh.dia5.repository.ProvinceRepository;
 import com.nckh.dia5.repository.UserChronicDiseaseRepository;
 import com.nckh.dia5.repository.UserDemographicRepository;
+import com.nckh.dia5.repository.UserLifestyleRepository;
 import com.nckh.dia5.repository.UserRepository;
 import com.nckh.dia5.repository.UserMedicationRepository;
 import com.nckh.dia5.repository.UserAllergyRepository;
@@ -25,6 +27,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final UserDemographicRepository userDemographicRepository;
+    private final UserLifestyleRepository userLifestyleRepository;
     private final ProvinceRepository provinceRepository;
     private final UserChronicDiseaseRepository userChronicDiseaseRepository;
     private final UserMedicationRepository userMedicationRepository;
@@ -128,6 +131,9 @@ public class UserService {
 
         user.setIsProfileComplete(isProfileComplete);
 
+        // Update lifestyle information
+        updateUserLifestyle(user, request);
+
         userRepository.save(user);
         userDemographicRepository.save(demographic);
 
@@ -151,5 +157,61 @@ public class UserService {
                 .createdAt(user.getCreatedAt())
                 .lastLoginAt(user.getLastLoginAt())
                 .build();
+    }
+
+    private void updateUserLifestyle(User user, UpdateProfileRequest request) {
+        // Get or create user lifestyle
+        UserLifestyle lifestyle = userLifestyleRepository.findByUserId(user.getId())
+                .orElse(new UserLifestyle());
+
+        if (lifestyle.getId() == null) {
+            lifestyle.setUser(user);
+        }
+
+        // Update smoking status
+        if (request.getSmokingStatus() != null) {
+            try {
+                UserLifestyle.SmokingStatus smokingStatus = UserLifestyle.SmokingStatus.valueOf(request.getSmokingStatus().toLowerCase());
+                lifestyle.setSmokingStatus(smokingStatus);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid smoking status: {}", request.getSmokingStatus());
+            }
+        }
+
+        // Update drinking status - map to alcohol frequency
+        if (request.getDrinkingStatus() != null) {
+            try {
+                switch (request.getDrinkingStatus().toLowerCase()) {
+                    case "never":
+                        lifestyle.setAlcoholFrequency(UserLifestyle.Frequency.never);
+                        break;
+                    case "occasional":
+                        lifestyle.setAlcoholFrequency(UserLifestyle.Frequency.rarely);
+                        break;
+                    case "frequent":
+                        lifestyle.setAlcoholFrequency(UserLifestyle.Frequency.weekly);
+                        break;
+                    default:
+                        log.warn("Invalid drinking status: {}", request.getDrinkingStatus());
+                }
+            } catch (Exception e) {
+                log.warn("Error mapping drinking status: {}", request.getDrinkingStatus(), e);
+            }
+        }
+
+        userLifestyleRepository.save(lifestyle);
+
+        // TODO: Handle medicalHistory, allergies, currentMedications
+        // These would need to be parsed and saved to separate tables
+        // For now, we'll log them for future implementation
+        if (request.getMedicalHistory() != null) {
+            log.info("Medical history provided (not yet implemented): {}", request.getMedicalHistory());
+        }
+        if (request.getAllergies() != null) {
+            log.info("Allergies provided (not yet implemented): {}", request.getAllergies());
+        }
+        if (request.getCurrentMedications() != null) {
+            log.info("Current medications provided (not yet implemented): {}", request.getCurrentMedications());
+        }
     }
 }

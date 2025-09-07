@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { 
   User, 
   Mail, 
@@ -9,28 +12,41 @@ import {
   UserPlus
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import type { RegisterRequest } from '../../types';
 import './styles/RegisterPage.css';
 
 const RegisterPage: React.FC = () => {
-  const { register, switchToLogin } = useAuth();
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  });
+  const { register: registerUser, switchToLogin, error, clearError, isLoading, authMode } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const navigate = useNavigate();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    watch,
+    setError,
+    clearErrors,
+  } = useForm<RegisterRequest>();
+
+  const watchedPassword = watch('password', '');
+
+  // Chuyển hướng nếu đã đăng nhập
+  useEffect(() => {
+    if (authMode === 'authenticated') {
+      navigate('/dashboard');
+    }
+  }, [authMode, navigate]);
+
+  // Xử lý error từ context
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      clearError();
+    }
+  }, [error, clearError]);
 
   const getPasswordStrength = (password: string) => {
     if (password.length < 6) return 'weak';
@@ -38,27 +54,23 @@ const RegisterPage: React.FC = () => {
     return 'strong';
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!agreeToTerms) {
-      alert('Vui lòng đồng ý với điều khoản dịch vụ');
-      return;
+  const onSubmit = async (data: RegisterRequest) => {
+    try {
+      if (!agreeToTerms) {
+        toast.error('Vui lòng đồng ý với điều khoản dịch vụ');
+        return;
+      }
+
+      clearErrors();
+      await registerUser(data.name || '', data.email, data.password, data.confirmPassword);
+      toast.success('Đăng ký thành công!');
+      navigate('/dashboard');
+    } catch (error) {
+      // Error đã được xử lý trong AuthContext và hiển thị qua useEffect
+      console.error('Register failed:', error);
     }
-    if (formData.password !== formData.confirmPassword) {
-      alert('Mật khẩu xác nhận không khớp');
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      register(formData.name, formData.email, formData.password);
-      setIsLoading(false);
-    }, 1500);
   };
 
-  const passwordStrength = getPasswordStrength(formData.password);
 
   return (
     <div className="register-page">
@@ -75,7 +87,7 @@ const RegisterPage: React.FC = () => {
         </div>
 
         {/* Register Form */}
-        <form onSubmit={handleSubmit} className="register-form">
+        <form onSubmit={handleSubmit(onSubmit)} className="register-form">
           <div className="form-group">
             <label htmlFor="name" className="form-label">
               Họ và tên
@@ -85,14 +97,19 @@ const RegisterPage: React.FC = () => {
               <input
                 type="text"
                 id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                className="form-input"
+                {...register('name', {
+                  maxLength: {
+                    value: 255,
+                    message: 'Tên không được quá 255 ký tự'
+                  }
+                })}
+                className={`form-input ${errors.name ? 'error' : ''}`}
                 placeholder="Nhập họ và tên của bạn"
-                required
               />
             </div>
+            {errors.name && (
+              <span className="error-message">{errors.name.message}</span>
+            )}
           </div>
 
           <div className="form-group">
@@ -104,14 +121,20 @@ const RegisterPage: React.FC = () => {
               <input
                 type="email"
                 id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className="form-input"
+                {...register('email', {
+                  required: 'Email không được để trống',
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: 'Email không đúng định dạng'
+                  }
+                })}
+                className={`form-input ${errors.email ? 'error' : ''}`}
                 placeholder=""
-                required
               />
             </div>
+            {errors.email && (
+              <span className="error-message">{errors.email.message}</span>
+            )}
           </div>
 
           <div className="form-group">
@@ -123,12 +146,15 @@ const RegisterPage: React.FC = () => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                className="form-input"
+                {...register('password', {
+                  required: 'Mật khẩu không được để trống',
+                  minLength: {
+                    value: 6,
+                    message: 'Mật khẩu phải có ít nhất 6 ký tự'
+                  }
+                })}
+                className={`form-input ${errors.password ? 'error' : ''}`}
                 placeholder="••••••••••"
-                required
               />
               <button
                 type="button"
@@ -139,13 +165,16 @@ const RegisterPage: React.FC = () => {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
-            {formData.password && (
+            {errors.password && (
+              <span className="error-message">{errors.password.message}</span>
+            )}
+            {watchedPassword && (
               <div className="password-strength">
                 <div className="strength-label">
-                  Độ mạnh: {passwordStrength === 'weak' ? 'Yếu' : passwordStrength === 'medium' ? 'Trung bình' : 'Mạnh'}
+                  Độ mạnh: {getPasswordStrength(watchedPassword) === 'weak' ? 'Yếu' : getPasswordStrength(watchedPassword) === 'medium' ? 'Trung bình' : 'Mạnh'}
                 </div>
                 <div className="strength-bar">
-                  <div className={`strength-fill ${passwordStrength}`}></div>
+                  <div className={`strength-fill ${getPasswordStrength(watchedPassword)}`}></div>
                 </div>
               </div>
             )}
@@ -160,12 +189,13 @@ const RegisterPage: React.FC = () => {
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
                 id="confirmPassword"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                className="form-input"
+                {...register('confirmPassword', {
+                  required: 'Xác nhận mật khẩu không được để trống',
+                  validate: (value) => 
+                    value === watchedPassword || 'Mật khẩu xác nhận không khớp'
+                })}
+                className={`form-input ${errors.confirmPassword ? 'error' : ''}`}
                 placeholder="Nhập lại mật khẩu"
-                required
               />
               <button
                 type="button"
@@ -176,6 +206,9 @@ const RegisterPage: React.FC = () => {
                 {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
+            {errors.confirmPassword && (
+              <span className="error-message">{errors.confirmPassword.message}</span>
+            )}
           </div>
 
           <div className="terms-agreement">
@@ -201,10 +234,10 @@ const RegisterPage: React.FC = () => {
           <div className="form-actions">
             <button
               type="submit"
-              disabled={isLoading || !agreeToTerms}
+              disabled={isSubmitting || isLoading || !agreeToTerms}
               className="register-btn"
             >
-              {isLoading ? (
+              {(isSubmitting || isLoading) ? (
                 <>
                   <div className="loading-spinner" />
                   Đang tạo tài khoản...

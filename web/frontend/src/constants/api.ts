@@ -12,8 +12,9 @@ export const API_ENDPOINTS = {
     REFRESH: '/auth/refresh',
   },
   USER: {
-    PROFILE: '/users/me',
-    UPDATE_PROFILE: '/users/profile',
+    PROFILE: '/users/profile',
+    UPDATE_PROFILE: '/users/profile', // Endpoint for demographic
+    UPDATE_HEALTH_PROFILE: '/users/health-profile', // New endpoint for health data
   },
   CHAT: {
     CREATE_SESSION: '/chat/sessions',

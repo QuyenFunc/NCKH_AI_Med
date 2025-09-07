@@ -30,8 +30,7 @@ public interface MedicationRepository extends JpaRepository<Medication, Integer>
     @Query("SELECT m FROM Medication m WHERE m.pregnancyCategory = :category ORDER BY m.name")
     List<Medication> findByPregnancyCategory(@Param("category") Medication.PregnancyCategory category);
 
-    @Query(value = "SELECT * FROM medications m WHERE " +
-            "MATCH(m.name, m.generic_name) AGAINST(:keyword IN NATURAL LANGUAGE MODE)", nativeQuery = true)
+    @Query("SELECT m FROM Medication m WHERE m.name LIKE %:keyword% OR m.genericName LIKE %:keyword% ORDER BY m.name")
     Page<Medication> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
     @Query("SELECT DISTINCT m.drugClass FROM Medication m WHERE m.drugClass IS NOT NULL ORDER BY m.drugClass")

@@ -33,7 +33,6 @@ public interface DiseaseCategoryRepository extends JpaRepository<DiseaseCategory
     @Query("SELECT dc FROM DiseaseCategory dc WHERE dc.isHereditary = true ORDER BY dc.name")
     List<DiseaseCategory> findHereditaryDiseases();
 
-    @Query(value = "SELECT * FROM disease_categories dc WHERE " +
-            "MATCH(dc.name, dc.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE)", nativeQuery = true)
+    @Query("SELECT dc FROM DiseaseCategory dc WHERE dc.name LIKE %:keyword% OR dc.description LIKE %:keyword% ORDER BY dc.name")
     Page<DiseaseCategory> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 }

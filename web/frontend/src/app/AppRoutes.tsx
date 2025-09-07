@@ -62,6 +62,14 @@ export const AppRoutes: React.FC = () => {
         } 
       />
       <Route 
+        path="/chat/:sessionId?" 
+        element={
+          <MainLayout>
+            <DashboardPage />
+          </MainLayout>
+        } 
+      />
+      <Route 
         path="/settings" 
         element={<SettingsPage />} 
       />

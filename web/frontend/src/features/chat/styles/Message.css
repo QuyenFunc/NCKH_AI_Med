@@ -53,6 +53,8 @@
   flex: 1;
   max-width: calc(100% - 48px);
   position: relative;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .message-content {
@@ -63,6 +65,8 @@
   word-wrap: break-word;
   overflow-wrap: break-word;
   box-shadow: var(--shadow-sm);
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .message.user .message-content {
@@ -136,6 +140,113 @@
 
 .status-icon.warning {
   color: var(--warning);
+}
+
+/* Streaming indicator */
+.message-status.streaming {
+  color: #3b82f6;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Message metadata */
+.message-metadata {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border-left: 3px solid #3b82f6;
+  font-size: 0.875rem;
+}
+
+.metadata-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.metadata-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Confidence bar */
+.confidence-bar {
+  width: 60px;
+  height: 4px;
+  background-color: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.confidence-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #10b981 100%);
+  transition: width 0.3s ease;
+}
+
+/* Sources */
+.metadata-sources {
+  margin-top: 0.75rem;
+}
+
+.metadata-sources h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.source-item {
+  padding: 0.5rem;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.source-title {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+.source-confidence {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.source-content {
+  color: #6b7280;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  margin-bottom: 0.25rem;
+}
+
+.source-link {
+  color: #3b82f6;
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.source-link:hover {
+  text-decoration: underline;
 }
 
 /* Markdown Content Styling */

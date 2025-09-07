@@ -93,7 +93,7 @@ Chỉ trả về JSON, không có text khác:"""
 
         try:
             response = client.chat.completions.create(
-                model="deepseek/deepseek-r1:free",
+                model="deepseek/deepseek-chat-v3.1:free",
                 messages=[{"role": "user", "content": entity_extraction_prompt}],
                 max_tokens=800,
                 temperature=0.1
@@ -145,7 +145,7 @@ Chỉ trả về JSON array:"""
 
         try:
             response = client.chat.completions.create(
-                model="deepseek/deepseek-r1:free",
+                model="deepseek/deepseek-chat-v3.1:free",
                 messages=[{"role": "user", "content": sub_query_prompt}],
                 max_tokens=1000,
                 temperature=0.2
@@ -212,7 +212,7 @@ Chỉ trả về JSON array:"""
 
         try:
             response = client.chat.completions.create(
-                model="deepseek/deepseek-r1:free",
+                model="deepseek/deepseek-chat-v3.1:free",
                 messages=[{"role": "user", "content": alternative_prompt}],
                 max_tokens=800,
                 temperature=0.3

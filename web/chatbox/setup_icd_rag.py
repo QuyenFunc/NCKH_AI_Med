@@ -255,9 +255,13 @@ class ICDMmsDataProcessor:
         
         return min(score, 100)  # Giới hạn 100 điểm
     
-    def load_existing_entities(self, filename="icd_entities_progress.pkl"):
+    def load_existing_entities(self, filename="mms_entities_progress.pkl"):
         """Load danh sách entities đã lấy từ file progress"""
         try:
+            # Đảm bảo tìm file trong thư mục chatbox/data
+            if not filename.startswith('chatbox/') and not os.path.isabs(filename):
+                filename = os.path.join(os.path.dirname(__file__), 'data', filename)
+                
             if os.path.exists(filename):
                 with open(filename, "rb") as f:
                     progress_data = pickle.load(f)
@@ -266,9 +270,28 @@ class ICDMmsDataProcessor:
             print(f"⚠️ Không thể load progress file: {e}")
         return set(), []
     
+    def get_next_batch_number(self):
+        """Tính số batch tiếp theo dựa trên số batch files đã có"""
+        current_dir = os.path.join(os.path.dirname(__file__), 'data')
+        batch_number = 1
+        
+        while True:
+            batch_filename = f"mms_batch_{batch_number:03d}.pkl"
+            batch_filepath = os.path.join(current_dir, batch_filename)
+            if os.path.exists(batch_filepath):
+                batch_number += 1
+            else:
+                break
+        
+        return batch_number
+    
     def save_progress(self, seen_uris, all_entities, filename="mms_entities_progress.pkl"):
         """Lưu progress sau mỗi batch"""
         try:
+            # Đảm bảo file được lưu trong thư mục chatbox/data
+            if not filename.startswith('chatbox/') and not os.path.isabs(filename):
+                filename = os.path.join(os.path.dirname(__file__), 'data', filename)
+                
             progress_data = {
                 'seen_uris': seen_uris,
                 'all_entities': all_entities,
@@ -390,11 +413,27 @@ class ICDMmsDataProcessor:
             children = self.get_release_children(release_url)
             start_uris.extend(children)
         
+        # Tạo queue từ release children chưa được xử lý
         queue = [(uri, 0) for uri in start_uris if uri not in seen_uris]
         
-        print(f"🎯 Sẽ bắt đầu từ {len(queue)} child URIs từ {len(releases)} releases")
+        # Thêm tất cả children chưa được xử lý từ các entities đã có
+        unprocessed_children_count = 0
+        for entity in all_entities:
+            entity_data = entity.get('data', {})
+            entity_depth = entity.get('depth', 0)
+            
+            if 'child' in entity_data and entity_depth < max_depth:
+                for child_uri in entity_data['child']:
+                    if child_uri not in seen_uris:
+                        queue.append((child_uri, entity_depth + 1))
+                        unprocessed_children_count += 1
         
-        batch_count = 0
+        print(f"🎯 Sẽ bắt đầu từ {len(queue)} URIs:")
+        print(f"   - Release children chưa xử lý: {len([uri for uri, depth in queue if depth == 0])}")
+        print(f"   - Entity children chưa xử lý: {unprocessed_children_count}")
+        
+        # Tính batch_count dựa trên số batch files đã có
+        batch_count = self.get_next_batch_number()
         entities_in_current_batch = []
         
         while queue:
@@ -429,7 +468,6 @@ class ICDMmsDataProcessor:
                 
                 # Kiểm tra nếu đủ batch size thì lưu progress
                 if len(entities_in_current_batch) >= batch_size:
-                    batch_count += 1
                     print(f"\n💾 Lưu batch #{batch_count} ({batch_size} entities)")
                     self.save_progress(seen_uris, all_entities)
                     
@@ -437,6 +475,7 @@ class ICDMmsDataProcessor:
                     self.process_and_save_batch(entities_in_current_batch, batch_count)
                     
                     entities_in_current_batch = []
+                    batch_count += 1  # Tăng batch_count sau khi lưu
                     print(f"📊 Tổng tiến độ: {len(all_entities)} entities, {len(queue)} còn lại trong queue\n")
                 
                 # Delay để tránh rate limiting
@@ -446,7 +485,6 @@ class ICDMmsDataProcessor:
         
         # Xử lý batch cuối cùng (nếu có)
         if entities_in_current_batch:
-            batch_count += 1
             print(f"\n💾 Lưu batch cuối #{batch_count} ({len(entities_in_current_batch)} entities)")
             self.save_progress(seen_uris, all_entities)
             self.process_and_save_batch(entities_in_current_batch, batch_count)
@@ -513,8 +551,11 @@ class ICDMmsDataProcessor:
                     'timestamp': datetime.now().isoformat()
                 }
                 
+                # Đảm bảo batch file được lưu trong thư mục chatbox/data
                 batch_filename = f"mms_batch_{batch_number:03d}.pkl"
-                with open(batch_filename, "wb") as f:
+                batch_filepath = os.path.join(os.path.dirname(__file__), 'data', batch_filename)
+                
+                with open(batch_filepath, "wb") as f:
                     pickle.dump(batch_data, f)
                 
                 print(f"✅ Đã lưu batch #{batch_number}: {len(batch_chunks)} chunks từ {valid_entities} entities vào {batch_filename}")
@@ -526,13 +567,16 @@ class ICDMmsDataProcessor:
         """Kết hợp tất cả các batch files thành file cuối cùng"""
         print("🔄 Đang kết hợp tất cả các batch files...")
         
-        # Tìm tất cả batch files
+        # Tìm tất cả batch files trong thư mục chatbox/data
         batch_files = []
         batch_number = 1
+        current_dir = os.path.join(os.path.dirname(__file__), 'data')
+        
         while True:
             batch_filename = f"mms_batch_{batch_number:03d}.pkl"
-            if os.path.exists(batch_filename):
-                batch_files.append(batch_filename)
+            batch_filepath = os.path.join(current_dir, batch_filename)
+            if os.path.exists(batch_filepath):
+                batch_files.append(batch_filepath)
                 batch_number += 1
             else:
                 break
@@ -589,8 +633,12 @@ class ICDMmsDataProcessor:
             'batch_count': len(batch_files)
         }
         
-        # Lưu final chunks data
-        with open("medical_chunks_with_metadata.pkl", "wb") as f:
+        # Lưu final chunks data trong thư mục chatbox/data
+        current_dir = os.path.join(os.path.dirname(__file__), 'data')
+        chunks_filepath = os.path.join(current_dir, "medical_chunks_with_metadata.pkl")
+        index_filepath = os.path.join(current_dir, "medical_faiss_index.index")
+        
+        with open(chunks_filepath, "wb") as f:
             pickle.dump(final_chunks_data, f)
         print("✅ Đã lưu final chunks data vào medical_chunks_with_metadata.pkl")
         
@@ -599,7 +647,7 @@ class ICDMmsDataProcessor:
         dimension = combined_embeddings.shape[1]
         index = faiss.IndexFlatL2(dimension)
         index.add(combined_embeddings)
-        faiss.write_index(index, "medical_faiss_index.index")
+        faiss.write_index(index, index_filepath)
         print("✅ Đã lưu FAISS index vào medical_faiss_index.index")
         
         print(f"\n🎉 HOÀN THÀNH KẾT HỢP!")
@@ -661,7 +709,29 @@ def setup_icd_rag_system(client_id, client_secret, batch_size=100, combine_batch
     # Dữ liệu đã được xử lý theo batch trong fetch_entities_for_rag
     print(f"✅ Đã lấy {len(entities_data)} entities với batch processing")
     
-    # Kết hợp tất cả batch files thành file cuối cùng
+    # Kiểm tra xem còn dữ liệu để xử lý không
+    seen_uris, _ = processor.load_existing_entities()
+    
+    # Đếm children chưa được xử lý
+    unprocessed_count = 0
+    for entity in entities_data:
+        entity_data = entity.get('data', {})
+        if 'child' in entity_data:
+            for child_uri in entity_data['child']:
+                if child_uri not in seen_uris:
+                    unprocessed_count += 1
+    
+    if unprocessed_count > 0:
+        print(f"🔄 Vẫn còn {unprocessed_count} children chưa được xử lý")
+        print("💡 Chạy lại script để tiếp tục xử lý dữ liệu")
+        return {
+            'success': True, 
+            'total_entities': len(entities_data), 
+            'unprocessed_children': unprocessed_count,
+            'message': f'Còn {unprocessed_count} children chưa xử lý. Chạy lại để tiếp tục.'
+        }
+    
+    # Kết hợp tất cả batch files thành file cuối cùng (chỉ khi không còn dữ liệu để xử lý)
     if combine_batches:
         print("\n🔄 Bắt đầu kết hợp các batch files...")
         result = processor.combine_all_batches()
@@ -694,38 +764,46 @@ if __name__ == "__main__":
     print("=" * 70)
     
     # Thiết lập RAG system với toàn bộ dữ liệu
-    result = setup_icd_rag_system(CLIENT_ID, CLIENT_SECRET, batch_size=100, combine_batches=True)
+    result = setup_icd_rag_system(CLIENT_ID, CLIENT_SECRET, batch_size=100, combine_batches=False)
     
     if result and result.get('success'):
-        print("\n🧪 Test tìm kiếm RAG:")
-        
-        # Test search function
-        try:
-            from medical_rag_utils import search_medical_symptoms_and_diseases
+        # Chỉ test tìm kiếm nếu đã combine batches hoặc không còn dữ liệu để xử lý
+        if not result.get('unprocessed_children', 0):
+            print("\n🧪 Test tìm kiếm RAG:")
             
-            test_queries = [
-                "đau đầu",
-                "sốt cao",
-                "khó thở",
-                "đau bụng",
-                "tim mạch"
-            ]
-            
-            for query in test_queries:
-                print(f"\n🔍 Test query: '{query}'")
-                results = search_medical_symptoms_and_diseases(query, top_k=3)
+            # Test search function
+            try:
+                # Thử import relative trước, fallback sang absolute import
+                try:
+                    from .medical_rag_utils import search_medical_symptoms_and_diseases
+                except ImportError:
+                    from medical_rag_utils import search_medical_symptoms_and_diseases
                 
-                if results:
-                    for i, result in enumerate(results, 1):
-                        metadata = result['metadata']
-                        print(f"  {i}. {metadata.get('entity_name', 'Unknown')}")
-                        print(f"     URI: {metadata.get('entity_uri', 'N/A')}")
-                        print(f"     Relevance: {result['relevance_score']:.3f}")
-                else:
-                    print("  Không tìm thấy kết quả")
+                test_queries = [
+                    "đau đầu",
+                    "sốt cao",
+                    "khó thở",
+                    "đau bụng",
+                    "tim mạch"
+                ]
+                
+                for query in test_queries:
+                    print(f"\n🔍 Test query: '{query}'")
+                    results = search_medical_symptoms_and_diseases(query, top_k=3)
                     
-        except Exception as e:
-            print(f"❌ Lỗi khi test tìm kiếm: {e}")
+                    if results:
+                        for i, result in enumerate(results, 1):
+                            metadata = result['metadata']
+                            print(f"  {i}. {metadata.get('entity_name', 'Unknown')}")
+                            print(f"     URI: {metadata.get('entity_uri', 'N/A')}")
+                            print(f"     Relevance: {result['relevance_score']:.3f}")
+                    else:
+                        print("  Không tìm thấy kết quả")
+                        
+            except Exception as e:
+                print(f"❌ Lỗi khi test tìm kiếm: {e}")
+        else:
+            print(f"\n💡 {result.get('message', 'Còn dữ liệu để xử lý')}")
     
     else:
         print("❌ Thiết lập RAG system thất bại")

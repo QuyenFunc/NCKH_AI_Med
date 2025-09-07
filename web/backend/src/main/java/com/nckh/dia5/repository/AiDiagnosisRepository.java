@@ -1,6 +1,7 @@
 package com.nckh.dia5.repository;
 
 import com.nckh.dia5.model.AiDiagnosis;
+import com.nckh.dia5.model.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -41,4 +42,11 @@ public interface AiDiagnosisRepository extends JpaRepository<AiDiagnosis, Intege
 
     @Query("SELECT ad FROM AiDiagnosis ad WHERE ad.user.id = :userId AND ad.createdAt >= :since")
     List<AiDiagnosis> findRecentByUserId(@Param("userId") String userId, @Param("since") LocalDateTime since);
+
+    // Additional methods for AiDiagnosisService
+    @Query("SELECT ad FROM AiDiagnosis ad WHERE ad.user = :user ORDER BY ad.createdAt DESC")
+    List<AiDiagnosis> findByUserOrderByCreatedAtDesc(@Param("user") User user);
+
+    @Query("SELECT ad FROM AiDiagnosis ad WHERE ad.user = :user AND ad.sessionId = :sessionId")
+    Optional<AiDiagnosis> findByUserAndSessionId(@Param("user") User user, @Param("sessionId") String sessionId);
 }

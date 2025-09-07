@@ -1,0 +1,37 @@
+.context-menu {
+  background: #2d2d2d;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  min-width: 120px;
+  border: 1px solid #404040;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #ffffff;
+  transition: background-color 0.2s ease;
+}
+
+.context-menu-item:hover {
+  background-color: #404040;
+}
+
+.context-menu-item.delete-item {
+  color: #ff6b6b;
+}
+
+.context-menu-item.delete-item:hover {
+  background-color: #ff6b6b20;
+  color: #ff5252;
+}
+
+.context-menu-item svg {
+  flex-shrink: 0;
+}
