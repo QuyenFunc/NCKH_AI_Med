@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   MessageSquare, 
   Plus, 
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChat } from '../../contexts/ChatContext';
+import { ROUTES } from '../../constants';
 import './styles/MainLayout.css';
 
 interface MainLayoutProps {
@@ -18,17 +20,18 @@ interface MainLayoutProps {
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  const navigate = useNavigate();
   const { logout } = useAuth();
   const { startNewSession } = useChat();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  React.useEffect(() => {
-    // Force light mode
-    document.documentElement.classList.remove('dark');
-  }, []);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleSettingsClick = () => {
+    navigate(ROUTES.SETTINGS);
   };
 
   // Mock chat history
@@ -77,7 +80,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             <User size={18} />
             <span>Hồ sơ</span>
           </button>
-          <button className="menu-item">
+          <button onClick={handleSettingsClick} className="menu-item">
             <Settings size={18} />
             <span>Cài đặt</span>
           </button>

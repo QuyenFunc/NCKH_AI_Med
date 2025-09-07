@@ -1,7 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useChat } from '../contexts/ChatContext';
 
 // Auth Pages
 import LoginPage from '../features/auth/LoginPage';
@@ -12,6 +11,7 @@ import ProfileSetupScreen from '../features/profile/ProfileSetupScreen';
 
 // Dashboard & Layout
 import { DashboardPage } from '../features/dashboard';
+import { SettingsPage } from '../features/settings';
 import { MainLayout } from '../components/layout';
 
 export const AppRoutes: React.FC = () => {
@@ -20,31 +20,10 @@ export const AppRoutes: React.FC = () => {
   // Show loading spinner while checking authentication
   if (isLoading) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100vh',
-        background: '#ffffff',
-        color: '#374151',
-        fontFamily: 'Inter, sans-serif'
-      }}>
-        <div style={{
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            border: '3px solid #e5e7eb',
-            borderTop: '3px solid #3b82f6',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-          }} />
-          <p style={{ margin: 0, fontSize: '16px', color: '#6b7280' }}>Đang tải...</p>
+      <div className="loading-screen">
+        <div className="loading-content">
+          <div className="loading-spinner" />
+          <p className="loading-text">Đang tải...</p>
         </div>
       </div>
     );
@@ -81,6 +60,10 @@ export const AppRoutes: React.FC = () => {
             <DashboardPage />
           </MainLayout>
         } 
+      />
+      <Route 
+        path="/settings" 
+        element={<SettingsPage />} 
       />
     </Routes>
   );

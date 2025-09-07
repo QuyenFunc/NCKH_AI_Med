@@ -1,6 +1,7 @@
 import React from 'react';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ChatProvider } from '../contexts/ChatContext';
+import { ThemeProvider } from '../contexts/ThemeContext';
 
 interface AppProviderProps {
   children: React.ReactNode;
@@ -8,10 +9,12 @@ interface AppProviderProps {
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   return (
-    <AuthProvider>
-      <ChatProvider>
-        {children}
-      </ChatProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ChatProvider>
+          {children}
+        </ChatProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 };

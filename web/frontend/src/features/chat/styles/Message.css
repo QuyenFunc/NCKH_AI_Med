@@ -1,4 +1,4 @@
-/* Message - Modern White Theme */
+/* Message - Themed */
 .message {
   display: flex;
   gap: 1rem;
@@ -37,15 +37,15 @@
   justify-content: center;
   color: white;
   font-weight: 500;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
 }
 
 .message-avatar.user {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
 }
 
 .message-avatar.assistant {
-  background: linear-gradient(135deg, #6b7280 0%, #374151 100%);
+  background: linear-gradient(135deg, var(--text-tertiary) 0%, var(--text-secondary) 100%);
 }
 
 /* Message Bubble */
@@ -62,35 +62,35 @@
   line-height: 1.5;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
 }
 
 .message.user .message-content {
-  background: #3b82f6;
+  background: var(--primary);
   color: white;
   border-bottom-right-radius: 4px;
   margin-left: 2rem;
 }
 
 .message.assistant .message-content {
-  background: #ffffff;
-  color: #111827;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
   border-bottom-left-radius: 4px;
   margin-right: 2rem;
 }
 
 /* Emergency and Warning States */
 .message-content.emergency {
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  background: linear-gradient(135deg, var(--error) 0%, var(--error) 100%);
   color: white;
-  border-color: #dc2626;
+  border-color: var(--error);
 }
 
 .message-content.warning {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  background: linear-gradient(135deg, var(--warning) 0%, var(--warning) 100%);
   color: white;
-  border-color: #f59e0b;
+  border-color: var(--warning);
 }
 
 /* Message Metadata */
@@ -100,7 +100,7 @@
   gap: 0.5rem;
   margin-top: 0.5rem;
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-tertiary);
 }
 
 .message.user .message-meta {
@@ -131,11 +131,11 @@
 }
 
 .status-icon.emergency {
-  color: #dc2626;
+  color: var(--error);
 }
 
 .status-icon.warning {
-  color: #f59e0b;
+  color: var(--warning);
 }
 
 /* Markdown Content Styling */
@@ -343,3 +343,4 @@
 .message.user .message-content::selection {
   background: rgba(255, 255, 255, 0.3);
 }
+

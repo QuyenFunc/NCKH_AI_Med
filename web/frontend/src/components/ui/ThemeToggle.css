@@ -1,0 +1,163 @@
+/* Theme Toggle Component Styles */
+.theme-toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: 'Inter', sans-serif;
+}
+
+.theme-toggle-container.sm {
+  gap: 0.5rem;
+}
+
+.theme-toggle-container.lg {
+  gap: 1rem;
+}
+
+.theme-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  user-select: none;
+}
+
+.theme-icon {
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+}
+
+.theme-icon.light {
+  color: var(--warning);
+}
+
+/* Toggle Switch */
+.theme-toggle-switch {
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0 40px;
+  cursor: pointer;
+  outline: none;
+  border-radius: 1.5rem;
+  transition: transform 0.1s ease;
+}
+
+.theme-toggle-switch:hover {
+  transform: scale(1.05);
+}
+
+.theme-toggle-switch:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.theme-toggle-switch:active {
+  transform: scale(0.95);
+}
+
+.toggle-track {
+  width: 3rem;
+  height: 1.5rem;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 1.5rem;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.theme-toggle-switch.active .toggle-track {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1.25rem;
+  height: 1.25rem;
+  background-color: var(--bg-primary);
+  border-radius: 50%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.theme-toggle-switch.active .toggle-thumb {
+  transform: translateX(1.5rem);
+  background-color: white;
+}
+
+.toggle-thumb .theme-icon {
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
+}
+
+.theme-toggle-switch.active .toggle-thumb .theme-icon {
+  color: var(--primary);
+}
+
+/* Size variations */
+.theme-toggle-container.sm .toggle-track {
+  width: 2.5rem;
+  height: 1.25rem;
+}
+
+.theme-toggle-container.sm .toggle-thumb {
+  width: 1rem;
+  height: 1rem;
+}
+
+.theme-toggle-container.sm .theme-toggle-switch.active .toggle-thumb {
+  transform: translateX(1.25rem);
+}
+
+.theme-toggle-container.sm .toggle-thumb .theme-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.theme-toggle-container.lg .toggle-track {
+  width: 3.5rem;
+  height: 1.75rem;
+}
+
+.theme-toggle-container.lg .toggle-thumb {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.theme-toggle-container.lg .theme-toggle-switch.active .toggle-thumb {
+  transform: translateX(1.75rem);
+}
+
+.theme-toggle-container.lg .toggle-thumb .theme-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .theme-toggle-label {
+    font-size: 0.8rem;
+  }
+  
+  .theme-toggle-container {
+    gap: 0.5rem;
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  .toggle-track,
+  .toggle-thumb,
+  .theme-toggle-switch {
+    transition: none;
+  }
+}
