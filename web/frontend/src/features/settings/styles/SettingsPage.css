@@ -1,0 +1,278 @@
+/* Settings Page Styles */
+.settings-page {
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+}
+
+/* Header */
+.settings-header {
+  position: sticky;
+  top: 0;
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-primary);
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  border-radius: 0.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.back-button:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.back-button:active {
+  transform: scale(0.95);
+}
+
+.settings-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* Content */
+.settings-content {
+  padding: 1.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Section Styles */
+.settings-section {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.section-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.settings-group {
+  padding: 0;
+}
+
+/* Setting Item */
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  border-bottom: 1px solid var(--border-primary);
+  transition: background-color 0.2s ease;
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-item.clickable {
+  cursor: pointer;
+}
+
+.setting-item.clickable:hover {
+  background-color: var(--bg-hover);
+}
+
+.setting-item.clickable:active {
+  background-color: var(--bg-active);
+}
+
+.setting-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+  line-height: 1.4;
+}
+
+.setting-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.setting-control {
+  margin-left: 1rem;
+  flex-shrink: 0;
+}
+
+.setting-arrow {
+  color: var(--text-tertiary);
+  transform: rotate(180deg);
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 1rem;
+}
+
+.setting-item.clickable:hover .setting-arrow {
+  color: var(--text-secondary);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .settings-content {
+    padding: 1rem;
+  }
+  
+  .settings-header {
+    padding: 1rem;
+  }
+  
+  .settings-title {
+    font-size: 1.25rem;
+  }
+  
+  .section-header {
+    padding: 1rem 1.25rem;
+  }
+  
+  .section-title {
+    font-size: 1rem;
+  }
+  
+  .setting-item {
+    padding: 1rem 1.25rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  
+  .setting-item.clickable {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .setting-control {
+    margin-left: 0;
+    align-self: flex-end;
+  }
+  
+  .setting-arrow {
+    margin-left: 0.5rem;
+  }
+  
+  .setting-info {
+    flex: 1;
+  }
+  
+  .setting-title {
+    font-size: 0.9rem;
+  }
+  
+  .setting-description {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-content {
+    padding: 0.75rem;
+  }
+  
+  .settings-header {
+    padding: 0.75rem;
+  }
+  
+  .section-header {
+    padding: 0.875rem 1rem;
+  }
+  
+  .setting-item {
+    padding: 0.875rem 1rem;
+  }
+  
+  .settings-container {
+    gap: 1.5rem;
+  }
+}
+
+/* Focus states for accessibility */
+.back-button:focus-visible,
+.setting-item.clickable:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Smooth transitions */
+.settings-section,
+.setting-item,
+.back-button {
+  transition: all 0.2s ease;
+}
+
+/* Loading states */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.setting-item.loading {
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 0px,
+    var(--bg-hover) 40px,
+    var(--bg-secondary) 80px
+  );
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite linear;
+}

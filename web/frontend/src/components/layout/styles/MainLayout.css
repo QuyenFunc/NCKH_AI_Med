@@ -1,21 +1,21 @@
-/* Main Layout - Pure White Theme */
+/* Main Layout - Themed */
 .main-layout {
   height: 100vh;
   display: flex;
-  background-color: #ffffff;
+  background-color: var(--bg-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Sidebar Styles */
 .sidebar {
   width: 320px;
-  background-color: #ffffff;
-  border-right: 1px solid #e5e7eb;
+  background-color: var(--bg-primary);
+  border-right: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease;
   overflow: hidden;
-  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 .sidebar.closed {
@@ -25,7 +25,7 @@
 /* Sidebar Header */
 .sidebar-header {
   padding: 14px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .new-chat-btn {
@@ -34,20 +34,20 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background-color: #3b82f6;
+  background-color: var(--primary);
   border: none;
   border-radius: 12px;
   color: white;
   font-weight: 600;
   transition: all 0.2s ease;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+  box-shadow: var(--shadow-sm);
 }
 
 .new-chat-btn:hover {
-  background-color: #2563eb;
+  background-color: var(--primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 /* Chat History */
@@ -62,7 +62,7 @@
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 1rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.875rem;
   font-weight: 500;
 }
@@ -85,7 +85,7 @@
 }
 
 .history-item:hover {
-  background-color: #f8fafc;
+  background-color: var(--bg-hover);
   transform: translateX(4px);
 }
 
@@ -96,7 +96,7 @@
 }
 
 .history-content svg {
-  color: #9ca3af;
+  color: var(--text-tertiary);
   margin-top: 0.25rem;
   flex-shrink: 0;
 }
@@ -109,7 +109,7 @@
 .history-title {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-primary);
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -118,19 +118,19 @@
 }
 
 .history-item:hover .history-title {
-  color: #2563eb;
+  color: var(--primary);
 }
 
 .history-time {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0.25rem 0 0 0;
 }
 
 /* User Menu */
 .user-menu {
   padding: 1rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -142,7 +142,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   background: transparent;
   border: none;
   border-radius: 8px;
@@ -152,17 +152,17 @@
 }
 
 .menu-item:hover {
-  color: #111827;
-  background-color: #f3f4f6;
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
 }
 
 .menu-item.logout {
-  color: #dc2626;
+  color: var(--error);
 }
 
 .menu-item.logout:hover {
-  color: #b91c1c;
-  background-color: #fef2f2;
+  color: var(--error);
+  background-color: var(--error-light);
 }
 
 /* Main Content */
@@ -179,9 +179,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  border-bottom: 1px solid #e5e7eb;
-  background-color: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid var(--border-primary);
+  background-color: var(--bg-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .header-left {
@@ -192,7 +192,7 @@
 
 .menu-toggle {
   padding: 0.5rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   background: transparent;
   border: none;
   border-radius: 8px;
@@ -201,8 +201,8 @@
 }
 
 .menu-toggle:hover {
-  color: #111827;
-  background-color: #f3f4f6;
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
 }
 
 .header-title {
@@ -214,7 +214,7 @@
 .app-icon {
   width: 2rem;
   height: 2rem;
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -225,7 +225,7 @@
 .header-title h1 {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 

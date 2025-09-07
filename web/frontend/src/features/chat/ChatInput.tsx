@@ -96,11 +96,6 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, disable
         </form>
         
         {/* Disclaimer */}
-        <div className="chat-disclaimer">
-          <p className="chat-disclaimer-text">
-            AI có thể đưa ra thông tin không chính xác. Hãy kiểm tra thông tin quan trọng với bác sĩ.
-          </p>
-        </div>
       </div>
     </div>
   );

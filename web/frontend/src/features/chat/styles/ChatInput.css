@@ -1,80 +1,94 @@
-/* ChatInput - Modern White Theme */
+/* ChatInput - Themed Chat Input Component */
 .chat-input {
-  border-top: 1px solid #e5e7eb;
-  background: #ffffff;
-  transition: background-color 0.2s ease;
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-primary);
+  z-index: 10;
+  transition: all 0.2s ease;
+}
+
+.chat-input.loading {
+  pointer-events: none;
 }
 
 .chat-input-container {
-  max-width: 1024px;
+  max-width: 768px;
   margin: 0 auto;
   padding: 1rem;
 }
 
 .chat-input-form {
-  position: relative;
+  width: 100%;
 }
 
 .chat-input-wrapper {
   position: relative;
-  display: flex;
-  align-items: end;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: #ffffff;
-  border: 2px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-primary);
   border-radius: 16px;
+  padding: 0.75rem;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
 }
 
 .chat-input-wrapper:focus-within {
-  border-color: #3b82f6;
+  border-color: var(--border-focus);
+  background: var(--bg-primary);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.chat-input-wrapper.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+  background: var(--bg-tertiary);
 }
 
 .chat-textarea {
   flex: 1;
-  resize: none;
-  background: transparent;
-  color: #111827;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  min-height: 24px;
-  max-height: 120px;
   border: none;
   outline: none;
+  background: transparent;
+  resize: none;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  min-height: 24px;
+  max-height: 120px;
   font-family: inherit;
+  padding: 0;
 }
 
 .chat-textarea::placeholder {
-  color: #9ca3af;
+  color: var(--text-tertiary);
 }
 
 .chat-textarea:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+  color: var(--text-tertiary);
 }
 
 .chat-send-button {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
+  outline: none;
 }
 
 .chat-send-button:hover:not(:disabled) {
-  background: #2563eb;
+  background: var(--primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .chat-send-button:active:not(:disabled) {
@@ -82,9 +96,13 @@
 }
 
 .chat-send-button:disabled {
-  background: #d1d5db;
+  background: var(--text-muted);
   cursor: not-allowed;
   transform: none;
+}
+
+.chat-send-button:focus {
+  box-shadow: 0 0 0 2px var(--border-focus);
 }
 
 .chat-send-spinner {
@@ -92,30 +110,27 @@
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .chat-input-meta {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   margin-top: 0.5rem;
-  padding: 0 0.75rem;
+  padding: 0 0.25rem;
 }
 
 .chat-input-help {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: #9ca3af;
 }
 
 .chat-input-counter {
   font-size: 0.75rem;
   color: #9ca3af;
+  font-weight: 500;
 }
 
 .chat-input-counter.warning {
@@ -123,33 +138,23 @@
 }
 
 .chat-input-counter.error {
-  color: #dc2626;
+  color: #ef4444;
 }
 
 .chat-disclaimer {
   margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 12px;
   text-align: center;
 }
 
 .chat-disclaimer-text {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: #92400e;
+  margin: 0;
   line-height: 1.4;
-}
-
-/* Enhanced states */
-.chat-input-wrapper.disabled {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.chat-input-wrapper.error {
-  border-color: #dc2626;
-}
-
-.chat-input-wrapper.error:focus-within {
-  border-color: #dc2626;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
 
 /* Responsive Design */
@@ -159,17 +164,24 @@
   }
   
   .chat-input-wrapper {
-    padding: 0.625rem 0.875rem;
-    border-radius: 12px;
+    padding: 0.625rem;
+    gap: 0.5rem;
   }
   
   .chat-send-button {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
   }
   
   .chat-input-meta {
-    padding: 0 0.5rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+  
+  .chat-disclaimer {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
   }
 }
 
@@ -179,43 +191,78 @@
   }
   
   .chat-input-wrapper {
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    border-radius: 12px;
   }
   
   .chat-textarea {
-    font-size: 0.8125rem;
+    font-size: 0.9rem;
   }
   
-  .chat-send-button {
-    width: 24px;
-    height: 24px;
-  }
-  
-  .chat-input-help,
-  .chat-input-counter {
-    font-size: 0.6875rem;
+  .chat-input-help {
+    display: none; /* Hide help text on very small screens */
   }
 }
 
-/* Focus states for accessibility */
-.chat-send-button:focus {
+/* Dark mode support (if needed later) */
+@media (prefers-color-scheme: dark) {
+  .chat-input {
+    background: #1f2937;
+    border-top-color: #374151;
+  }
+  
+  .chat-input-wrapper {
+    background: #374151;
+    border-color: #4b5563;
+  }
+  
+  .chat-input-wrapper:focus-within {
+    background: #1f2937;
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+  }
+  
+  .chat-textarea {
+    color: #f9fafb;
+  }
+  
+  .chat-textarea::placeholder {
+    color: #9ca3af;
+  }
+  
+  .chat-disclaimer {
+    background: #451a03;
+    border-color: #92400e;
+  }
+  
+  .chat-disclaimer-text {
+    color: #fbbf24;
+  }
+}
+
+/* Accessibility improvements */
+.chat-input-wrapper:focus-within .chat-textarea {
+  outline: none;
+}
+
+.chat-send-button:focus-visible {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;
 }
 
-/* Smooth animations */
-.chat-input-wrapper,
-.chat-send-button,
-.chat-textarea {
-  transition: all 0.2s ease;
+/* Animation for smooth interactions */
+.chat-input-wrapper {
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* Loading state */
+.chat-send-button {
+  transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+/* Loading state improvements */
+.chat-input.loading .chat-input-wrapper {
+  opacity: 0.8;
+}
+
 .chat-input.loading .chat-textarea {
-  opacity: 0.7;
-}
-
-.chat-input.loading .chat-send-button {
   pointer-events: none;
 }
