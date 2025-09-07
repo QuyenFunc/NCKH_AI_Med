@@ -1,5 +1,6 @@
 import React, { createContext, useContext } from 'react';
 import { useChat as useOriginalChat } from '../hooks/useChat';
+import { useSession } from './SessionContext';
 import type { Message } from '../types';
 
 interface ChatContextType {
@@ -8,7 +9,8 @@ interface ChatContextType {
   isLoading: boolean;
   error: string | null;
   sendMessage: (message: string) => Promise<void>;
-  startNewSession: () => void;
+  startNewSession: (forceNew?: boolean) => Promise<string | null>;
+  loadExistingSession: (sessionId: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -19,7 +21,8 @@ interface ChatProviderProps {
 }
 
 export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
-  const chatState = useOriginalChat();
+  const { notifySessionCreated } = useSession();
+  const chatState = useOriginalChat(notifySessionCreated);
 
   return (
     <ChatContext.Provider value={chatState}>

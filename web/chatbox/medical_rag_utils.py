@@ -3,13 +3,19 @@ from sentence_transformers import SentenceTransformer
 import faiss
 import pickle
 import json
+import os
 from datetime import datetime
 import re
 
 def load_medical_data():
     """Load medical FAISS index và chunks data"""
     try:
-        with open("medical_chunks_with_metadata.pkl", "rb") as f:
+        # Đảm bảo tìm file trong thư mục chatbox
+        current_dir = os.path.dirname(__file__)
+        chunks_file = os.path.join(current_dir, "medical_chunks_with_metadata.pkl")
+        index_file = os.path.join(current_dir, "medical_faiss_index.index")
+        
+        with open(chunks_file, "rb") as f:
             data = pickle.load(f)
         
         # Handle different data formats
@@ -21,7 +27,7 @@ def load_medical_data():
             print("❌ Unknown chunks data format")
             return None, None, None
         
-        index = faiss.read_index("medical_faiss_index.index")
+        index = faiss.read_index(index_file)
         
         # Load embedder - sử dụng all-MiniLM-L6-v2 để match với FAISS index hiện tại
         try:
@@ -349,7 +355,11 @@ def create_medical_consultation_context(search_results, consultation_type="gener
 def get_medical_statistics():
     """Lấy thống kê về medical knowledge base"""
     try:
-        with open("medical_chunks_with_metadata.pkl", "rb") as f:
+        # Đảm bảo tìm file trong thư mục chatbox
+        current_dir = os.path.dirname(__file__)
+        chunks_file = os.path.join(current_dir, "medical_chunks_with_metadata.pkl")
+        
+        with open(chunks_file, "rb") as f:
             chunks_data = pickle.load(f)
         
         metadata_list = chunks_data.get('metadata', [])

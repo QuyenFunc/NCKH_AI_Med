@@ -11,6 +11,29 @@ import time
 import re
 import json
 from collections import deque
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    np = None
+
+def ensure_json_serializable(obj):
+    """Convert any NumPy types to Python native types for JSON serialization"""
+    if hasattr(obj, 'item'):  # NumPy scalar
+        return obj.item()
+    elif NUMPY_AVAILABLE and isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif NUMPY_AVAILABLE and isinstance(obj, (np.float32, np.float64)):
+        return float(obj)
+    elif NUMPY_AVAILABLE and isinstance(obj, (np.int32, np.int64)):
+        return int(obj)
+    elif isinstance(obj, dict):
+        return {k: ensure_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [ensure_json_serializable(item) for item in obj]
+    else:
+        return obj
 
 # Import RAG utilities
 from medical_rag_utils import (
@@ -259,7 +282,6 @@ class EnhancedMedicalChatbot:
             except Exception as e:
                 print(f"⚠️ Query compression failed: {e}")
         
-        # 5. AI Service (OpenRouter DeepSeek)
         if AI_SERVICE_AVAILABLE:
             try:
                 self.ai_service = get_medical_ai_service()
@@ -635,8 +657,8 @@ Dựa trên thông tin y khoa hiện có, tôi khuyến nghị bạn:
             'intent': intent
         }
 
-    def chat(self, query, session_id=None):
-        """Ultra-fast enhanced chat function với tất cả optimizations"""
+    def semantic_search(self, query, session_id=None):
+        """Ultra-fast enhanced chat function với streaming support"""
         if not session_id:
             session_id = str(uuid.uuid4())
         
@@ -657,6 +679,10 @@ Dựa trên thông tin y khoa hiện có, tôi khuyến nghị bạn:
                     cached_result['from_cache'] = True
                     cached_result['cache_level'] = cache_level
                     cached_result['total_time'] = time.time() - total_start_time
+                    # ✅ Add missing fields for chat_stream compatibility
+                    cached_result['session_id'] = session_id
+                    session = self.get_session(session_id)
+                    cached_result['context_info'] = self.extract_conversation_context(session)
                     return cached_result
             except Exception as e:
                 print(f"⚠️ Advanced cache failed: {e}")
@@ -670,6 +696,10 @@ Dựa trên thông tin y khoa hiện có, tôi khuyến nghị bạn:
             cached_response['from_cache'] = True
             cached_response['cache_level'] = 'simple'
             cached_response['total_time'] = time.time() - total_start_time
+            # ✅ Add missing fields for chat_stream compatibility
+            cached_response['session_id'] = session_id
+            session = self.get_session(session_id)
+            cached_response['context_info'] = self.extract_conversation_context(session)
             return cached_response
         
         # 3. Log initial query
@@ -762,194 +792,26 @@ Dựa trên thông tin y khoa hiện có, tôi khuyến nghị bạn:
         search_results = []
         search_method = "unknown"
         
-        # Strategy 1: Fast Hybrid Search (highest priority)
-        if self.fast_hybrid_engine:
-            try:
-                search_results = self.fast_hybrid_engine.fast_hybrid_search(
-                    search_query, top_k=5, use_cache=True
-                )
-                search_time = time.time() - search_start_time
-                search_method = "ultra_fast_hybrid"
-                if search_results and search_time < 2.0:
-                    self.ultra_fast_stats['optimization_wins']['fast_hybrid'] += 1
-                    print(f"🚀 Ultra-fast hybrid: {len(search_results)} results in {search_time:.2f}s")
-                else:
-                    # If too slow, fall through to other methods
-                    search_results = []
-            except Exception as e:
-                print(f"⚠️ Fast hybrid search failed: {e}")
-        
-        # Strategy 2: Parallel Search (if fast hybrid failed)
-        if not search_results and self.parallel_search:
-            try:
-                parallel_results = self.parallel_search.parallel_search(
-                    search_query, search_methods=['semantic'], top_k=5
-                )
-                if parallel_results.get('semantic'):
-                    search_results = parallel_results['semantic']
-                    search_time = time.time() - search_start_time
-                    search_method = "parallel_semantic"
-                    self.ultra_fast_stats['optimization_wins']['async_processing'] += 1
-                    print(f"⚡ Parallel search: {len(search_results)} results in {search_time:.2f}s")
-            except Exception as e:
-                print(f"⚠️ Parallel search failed: {e}")
-        
-        # Strategy 3: Standard Hybrid Search
-        if not search_results and self.hybrid_search_engine:
-            try:
-                search_results = self.hybrid_search_engine.hybrid_search(search_query, top_k=5)
-                search_time = time.time() - search_start_time
-                search_method = "standard_hybrid"
-                print(f"🔍 Standard hybrid: {len(search_results)} results in {search_time:.2f}s")
-            except Exception as e:
-                print(f"⚠️ Standard hybrid search failed: {e}")
-        
-        # Strategy 4: Fallback Semantic Search
-        if not search_results:
+
             search_results = search_medical_symptoms_and_diseases(search_query, top_k=5)
             search_time = time.time() - search_start_time
             search_method = "fallback_semantic"
             print(f"🔄 Fallback semantic: {len(search_results)} results in {search_time:.2f}s")
-        
-        # Log search
-        if LOGGING_AVAILABLE:
-            try:
-                log_search(search_query, len(search_results), search_time)
-            except Exception as e:
-                print(f"⚠️ Search logging failed: {e}")
-        
+        print(search_results)
         self.stats['search_times'].append(search_time)
         
         # 13. AI-powered response generation
         response_start_time = time.time()
-        
-        if self.ai_service:
-            try:
-                ai_response_data = self.ai_service.generate_medical_response(
-                    original_query, search_results, intent_info, context_info
-                )
-                
-                # Create full response data structure
                 response_data = {
-                    'response': ai_response_data['response'],
-                    'confidence': intent_info.get('confidence', 0.7),
-                    'sources': self._create_sources_from_results(search_results),
-                    'intent': intent,
-                    'ai_generated': ai_response_data['ai_generated'],
-                    'ai_model': ai_response_data.get('model', 'unknown'),
-                    'urgency_level': intent_info.get('urgency_level', 'low'),
-                    'key_entities': intent_info.get('key_entities', []),
-                    'ai_analysis': intent_info.get('analysis', '')
-                }
-                
-                print(f"🤖 AI Response: {'Generated' if ai_response_data['ai_generated'] else 'Template'}")
-                
-            except Exception as e:
-                print(f"⚠️ AI response generation failed: {e}")
-                # Fallback to template response
-                response_data = self.create_medical_response(original_query, search_results, intent)
-                response_data['ai_generated'] = False
-                response_data['ai_model'] = 'template_fallback'
-        else:
-            # Fallback to template response
-            response_data = self.create_medical_response(original_query, search_results, intent)
-            response_data['ai_generated'] = False
-            response_data['ai_model'] = 'template_only'
-        
-        response_time = time.time() - response_start_time
-        self.stats['response_times'].append(response_time)
-        
-        # 14. Structured extraction (if applicable)
-        if EXTRACTION_AVAILABLE:
-            try:
-                if intent in ['symptom_analysis', 'disease_inquiry']:
-                    extracted_structure = extract_medical_structure(
-                        response_data['response'], 
-                        original_query, 
-                        intent
-                    )
-                    if extracted_structure:
-                        response_data['structured_data'] = extracted_structure
-                        print("🏗️ Medical structure extracted")
-            except Exception as e:
-                print(f"⚠️ Structure extraction failed: {e}")
-        
-        # 12. Add to conversation history with context info
-        session['messages'].append({
-            'timestamp': datetime.now().isoformat(),
-            'user_query': original_query,
-            'resolved_query': resolved_query if resolved_query != original_query else None,
-            'enhanced_query': enhanced_query if enhanced_query != resolved_query else None,
-            'intent': intent,
-            'response': response_data['response'],
-            'confidence': response_data['confidence'],
-            'sources_count': len(response_data['sources']),
-            'search_time': search_time,
-            'response_time': response_time,
-            'context_used': bool(context_info and (resolved_query != original_query or enhanced_query != resolved_query))
-        })
-        
-        # Limit history size
-        if len(session['messages']) > 20:
-            session['messages'] = session['messages'][-20:]
-        
-        # Calculate total time and update ultra-fast stats
-        total_time = time.time() - total_start_time
-        if total_time < 3.0:
-            self.ultra_fast_stats['sub_3s_responses'] += 1
-        
-        # 13. Add comprehensive metadata to response
-        response_data['session_id'] = session_id
-        response_data['message_count'] = len(session['messages'])
-        response_data['search_method'] = search_method
-        response_data['search_time'] = search_time
-        response_data['response_time'] = response_time
-        response_data['compression_time'] = compression_time if compressed_query_info else 0
-        response_data['total_time'] = total_time
-        response_data['timestamp'] = datetime.now().isoformat()
-        response_data['from_cache'] = False
-        response_data['original_query'] = original_query
-        response_data['resolved_query'] = resolved_query if resolved_query != original_query else None
-        response_data['enhanced_query'] = enhanced_query if enhanced_query != resolved_query else None
-        response_data['compressed_query'] = compressed_query_info.compressed if compressed_query_info else None
-        response_data['compression_ratio'] = compressed_query_info.compression_ratio if compressed_query_info else 1.0
-        response_data['context_used'] = bool(context_info and (resolved_query != original_query or enhanced_query != resolved_query))
-        response_data['context_entities'] = context_info['mentioned_entities'] if context_info else []
-        response_data['optimizations_used'] = self._get_optimizations_used()
-        response_data['ultra_fast_performance'] = {
-            'sub_3s_achieved': total_time < 3.0,
-            'performance_grade': self._get_performance_grade(total_time)
+            "intent_info" : intent_info,
+            "intent": intent,  # ✅ intent đã là string rồi, không cần ['intent']
+            "confidence": intent_info['confidence'],  # ✅ confidence nằm trong intent_info
+            "sources": search_results,
+            "search_time": search_time,
+            "total_time": time.time() - total_start_time,
+            "session_id": session_id,
+            "context_info": context_info
         }
-        
-        # 14. Cache response with advanced caching
-        if self.smart_cache:
-            try:
-                session_context = self._get_lightweight_session_context(session_id)
-                self.smart_cache.cache_result(
-                    original_query, response_data,
-                    context=session_context, ttl=1800
-                )
-                print("💾 Advanced cache updated")
-            except Exception as e:
-                print(f"⚠️ Advanced caching failed: {e}")
-        
-        # Fallback to simple cache
-        if len(self.answer_cache) < self.max_cache_size:
-            self.answer_cache[cache_key] = response_data.copy()
-            print(f"💾 Simple cache updated (size: {len(self.answer_cache)})")
-        elif len(self.answer_cache) >= self.max_cache_size:
-            oldest_key = next(iter(self.answer_cache))
-            del self.answer_cache[oldest_key]
-            self.answer_cache[cache_key] = response_data.copy()
-            print("💾 Simple cache refreshed")
-        
-        # 13. Log LLM response
-        if LOGGING_AVAILABLE:
-            try:
-                log_llm(query, response_data['response'], response_data['confidence'])
-            except Exception as e:
-                print(f"⚠️ LLM logging failed: {e}")
-        
         return response_data
     
     def _get_optimizations_used(self):
@@ -1107,34 +969,103 @@ def chat_stream():
         query = data['query'].strip()
         session_id = data.get('session_id')
         
+        # ✅ Fixed: Sử dụng đúng tên method
+        response = chatbot.semantic_search(query, session_id)
+        intent_info = response['intent_info']
+        intent = intent_info['intent']
+        confidence = response['confidence']
+        search_results = response['sources']
+        search_time = response['search_time']
+        total_time = response['total_time']
+        session_id = response['session_id']
+        context_info = response['context_info']
+        
+        # Generate streaming response
         def generate_stream():
-            # Get response first
-            response = chatbot.chat(query, session_id)
-            
-            # Stream the response word by word
-            words = response['response'].split(' ')
-            for i, word in enumerate(words):
-                chunk_data = {
-                    'chunk': word + (' ' if i < len(words) - 1 else ''),
-                    'word_index': i,
-                    'total_words': len(words),
-                    'session_id': response['session_id']
-                }
+            try:
+                full_answer_parts = []  # ✅ Collect chunks to build full answer
                 
-                yield f"data: {json.dumps(chunk_data)}\\n\\n"
-                time.sleep(0.05)  # Small delay for realistic streaming
-            
-            # Send final metadata
-            final_data = {
+                for chunk in chatbot.ai_service.generate_medical_response(
+                    query, search_results, intent_info, context_info, stream=True
+                ):
+                    if chunk:
+                        # ✅ Transform data to match frontend format
+                        transformed_chunk = None
+                        
+                        if chunk.get('type') == 'chunk' and chunk.get('content'):
+                            # Transform chunk data for frontend
+                            full_answer_parts.append(chunk['content'])
+                            transformed_chunk = {
+                                'chunk': chunk['content'],  # ✅ 'content' → 'chunk' 
+                                'word_index': 0,
+                                'session_id': session_id
+                            }
+                            # ✅ Ensure chunk data is JSON serializable
+                            transformed_chunk = ensure_json_serializable(transformed_chunk)
+                            
+                        elif chunk.get('type') == 'final':
+                            # Transform final data for frontend
+                            if chunk.get('response'):
+                                full_answer_parts.append(chunk['response'])
+                            
+                            # ✅ Transform sources format
+                            transformed_sources = []
+                            for source in search_results:
+                                metadata = source.get('metadata', {})
+                                transformed_sources.append({
+                                    'title': metadata.get('entity_name', 'Unknown Medical Entity'),
+                                    'url': metadata.get('browser_url', ''),
+                                    'content': metadata.get('description', ''),
+                                    'confidence': source.get('relevance_score', source.get('semantic_score', 0))
+                                })
+                            
+                            transformed_chunk = {
                 'type': 'final',
-                'confidence': response['confidence'],
-                'intent': response['intent'],
-                'sources': response['sources'],
-                'search_time': response['search_time'],
-                'session_id': response['session_id']
-            }
-            yield f"data: {json.dumps(final_data)}\\n\\n"
-            yield "data: [DONE]\\n\\n"
+                                'confidence': confidence,
+                                'sources': transformed_sources,
+                                'processing_time': chunk.get('response_time', total_time),
+                                'search_time': search_time,
+                                'session_id': session_id,
+                                'intent': intent
+                            }
+                            
+                            # ✅ Ensure all data is JSON serializable
+                            transformed_chunk = ensure_json_serializable(transformed_chunk)
+                        
+                        if transformed_chunk:
+                            yield f"data: {json.dumps(transformed_chunk)}\n\n"
+                
+                # ✅ Build complete answer from collected parts
+                full_answer = ''.join(full_answer_parts) if full_answer_parts else "AI response generated"
+                
+                # Save to conversation history  
+                conversation_data = {
+                    'timestamp': datetime.now().isoformat(),
+                    'user_query': query,
+                    'response': full_answer,
+                    'confidence': confidence,
+                    'sources_count': len(search_results),
+                    'intent': intent,
+                    'search_time': search_time,
+                    'total_time': total_time
+                }
+                # ✅ Ensure conversation data is JSON serializable
+                conversation_data = ensure_json_serializable(conversation_data)
+                chatbot.conversation_history[session_id]['messages'].append(conversation_data)
+                
+                yield "data: [DONE]\n\n"
+                
+            except Exception as e:
+                print(f"❌ Stream generation error: {e}")
+                # ✅ Send error in format frontend expects
+                error_chunk = {
+                    'type': 'error',
+                    'error': str(e),
+                    'session_id': session_id
+                }
+                # ✅ Ensure error data is JSON serializable
+                error_chunk = ensure_json_serializable(error_chunk)
+                yield f"data: {json.dumps(error_chunk)}\n\n"
         
         return Response(
             stream_with_context(generate_stream()),
@@ -1142,7 +1073,9 @@ def chat_stream():
             headers={
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
-                'X-Accel-Buffering': 'no'
+                'X-Accel-Buffering': 'no',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type'
             }
         )
         

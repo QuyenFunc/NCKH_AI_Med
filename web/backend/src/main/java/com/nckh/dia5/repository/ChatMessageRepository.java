@@ -1,6 +1,7 @@
 package com.nckh.dia5.repository;
 
 import com.nckh.dia5.model.ChatMessage;
+import com.nckh.dia5.model.ChatSession;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -38,4 +39,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Intege
 
     @Query("SELECT AVG(cm.aiConfidence) FROM ChatMessage cm WHERE cm.sender = 'ai' AND cm.aiConfidence IS NOT NULL")
     Double findAverageAiConfidence();
+
+    // Additional methods for ChatService
+    @Query("SELECT cm FROM ChatMessage cm WHERE cm.session = :session ORDER BY cm.messageOrder ASC")
+    List<ChatMessage> findBySessionOrderByMessageOrderAsc(@Param("session") ChatSession session);
 }

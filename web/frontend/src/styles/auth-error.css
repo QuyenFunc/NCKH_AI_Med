@@ -1,0 +1,28 @@
+/* Error states for authentication forms */
+.form-input.error {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.error-message {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.875rem;
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.form-group .error-message {
+  margin-bottom: 0;
+}
+
+/* Toast notification styles */
+.Toastify__toast--error {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.Toastify__toast--success {
+  background-color: #d1fae5;
+  color: #065f46;
+}

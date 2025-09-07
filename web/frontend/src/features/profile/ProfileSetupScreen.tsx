@@ -5,12 +5,11 @@ import toast from 'react-hot-toast';
 import { 
   Heart, 
   Lock, 
-  Loader2, 
   Plus 
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import type { ProfileFormData } from '../../types';
-import { ApiService } from '../../services/api';
+import { UserService } from '../../services/user.service';
 import { MEDICAL_CONDITIONS, SMOKING_OPTIONS, DRINKING_OPTIONS, ROUTES } from '../../constants';
 import './styles/ProfileSetupScreen.css';
 
@@ -30,8 +29,8 @@ const ProfileSetupScreen: React.FC = () => {
       medicalHistory: '',
       allergies: '',
       currentMedications: '',
-      smokingStatus: 'never',
-      drinkingStatus: 'never'
+      smokingStatus: 'never' as const,
+      drinkingStatus: 'never' as const
     }
   });
 
@@ -52,27 +51,21 @@ const ProfileSetupScreen: React.FC = () => {
     setIsLoading(true);
     
     try {
-      const result = await ApiService.saveProfile(data);
+      await UserService.updateHealthProfile(data);
       
-      if (result.success) {
-        toast.success('Hồ sơ đã được lưu thành công!', {
-          duration: 3000,
-          position: 'top-center',
-        });
-        
-        // Mark profile as completed and navigate to dashboard
-        setHasCompletedProfile(true);
-        setTimeout(() => {
-          navigate(ROUTES.DASHBOARD);
-        }, 1000);
-      } else {
-        toast.error('Có lỗi xảy ra khi lưu hồ sơ.', {
-          duration: 4000,
-          position: 'top-center',
-        });
-      }
+      toast.success('Hồ sơ đã được lưu thành công!', {
+        duration: 3000,
+        position: 'top-center',
+      });
+      
+      // Mark profile as completed and navigate to dashboard
+      setHasCompletedProfile(true);
+      setTimeout(() => {
+        navigate(ROUTES.DASHBOARD);
+      }, 1000);
     } catch (error) {
-      toast.error('Có lỗi xảy ra khi lưu hồ sơ.', {
+      const errorMessage = error instanceof Error ? error.message : 'Có lỗi xảy ra khi lưu hồ sơ.';
+      toast.error(errorMessage, {
         duration: 4000,
         position: 'top-center',
       });

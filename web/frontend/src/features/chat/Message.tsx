@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { User, Bot, AlertTriangle, AlertCircle, Clock } from 'lucide-react';
+import { User, Bot, AlertTriangle, AlertCircle, Clock, Target, ExternalLink, Loader } from 'lucide-react';
 import type { Message as MessageType } from '../../types';
 import './styles/Message.css';
 
@@ -73,6 +73,15 @@ const Message: React.FC<MessageProps> = ({ message }) => {
             <span>{formatTimestamp(message.timestamp)}</span>
           </div>
           
+          {/* Streaming Indicator */}
+          {message.isStreaming && (
+            <div className="message-status streaming">
+              <Loader size={12} className="spinning" />
+              <span>Đang trả lời...</span>
+            </div>
+          )}
+          
+          {/* Emergency/Warning Status */}
           {(hasEmergency || hasWarning) && (
             <div className="message-status">
               {hasEmergency ? (
@@ -84,6 +93,65 @@ const Message: React.FC<MessageProps> = ({ message }) => {
             </div>
           )}
         </div>
+
+        {/* Chat Metadata (for assistant messages) */}
+        {!isUser && message.metadata && !message.isStreaming && (
+          <div className="message-metadata">
+            {/* Confidence Score */}
+            {message.metadata.confidence !== undefined && (
+              <div className="metadata-item confidence">
+                <Target size={12} />
+                <span>Độ tin cậy: {Math.round(message.metadata.confidence * 100)}%</span>
+                <div className="confidence-bar">
+                  <div 
+                    className="confidence-fill" 
+                    style={{ width: `${message.metadata.confidence * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Sources */}
+            {message.metadata.sources && message.metadata.sources.length > 0 && (
+              <div className="metadata-sources">
+                <h4>Nguồn tham khảo:</h4>
+                <div className="sources-list">
+                  {message.metadata.sources.slice(0, 3).map((source, index) => (
+                    <div key={index} className="source-item">
+                      <div className="source-title">
+                        <ExternalLink size={12} />
+                        <span>{source.title}</span>
+                        {source.confidence && (
+                          <span className="source-confidence">
+                            ({Math.round(source.confidence * 100)}%)
+                          </span>
+                        )}
+                      </div>
+                      {source.content && (
+                        <div className="source-content">
+                          {source.content.length > 200 
+                            ? `${source.content.substring(0, 200)}...` 
+                            : source.content
+                          }
+                        </div>
+                      )}
+                      {source.url && (
+                        <a 
+                          href={source.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="source-link"
+                        >
+                          Xem chi tiết
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import com.nckh.dia5.dto.medical.AiDiagnosisRequest;
 import com.nckh.dia5.dto.medical.AiDiagnosisResponse;
 import com.nckh.dia5.model.AiDiagnosis;
 import com.nckh.dia5.model.User;
+import com.nckh.dia5.model.UserDemographic;
 import com.nckh.dia5.model.UserSymptomReport;
 import com.nckh.dia5.repository.AiDiagnosisRepository;
 import com.nckh.dia5.repository.UserSymptomReportRepository;
@@ -43,7 +44,7 @@ public class AiDiagnosisService {
 
             // Lấy các symptom reports trong session
             List<UserSymptomReport> symptoms = symptomReportRepository
-                    .findByUserAndSessionIdOrderByReportedAtDesc(currentUser, sessionId);
+                    .findByUserAndSessionId(currentUser, sessionId);
 
             if (symptoms.isEmpty()) {
                 throw new IllegalArgumentException("Không tìm thấy triệu chứng trong session: " + sessionId);
@@ -68,13 +69,16 @@ public class AiDiagnosisService {
 
     private AiDiagnosisRequest buildDiagnosisRequest(User user, List<UserSymptomReport> symptoms, String sessionId) {
         // Build user profile
+        UserDemographic demographics = user.getUserDemographic();
         AiDiagnosisRequest.UserProfile userProfile = AiDiagnosisRequest.UserProfile.builder()
-                .age(calculateAge(user.getDemographics()))
-                .gender(user.getDemographics() != null ? user.getDemographics().getGender().toString() : null)
-                .heightCm(user.getDemographics() != null ? user.getDemographics().getHeightCm() : null)
-                .weightKg(user.getDemographics() != null ? user.getDemographics().getWeightKg().doubleValue() : null)
-                .province(user.getDemographics() != null && user.getDemographics().getProvince() != null
-                        ? user.getDemographics().getProvince().getName()
+                .age(calculateAge(demographics))
+                .gender(demographics != null ? demographics.getGender().toString() : null)
+                .heightCm(demographics != null ? demographics.getHeightCm() : null)
+                .weightKg(demographics != null && demographics.getWeightKg() != null
+                        ? demographics.getWeightKg().doubleValue()
+                        : null)
+                .province(demographics != null && demographics.getProvince() != null
+                        ? demographics.getProvince().getName()
                         : null)
                 .medicalHistory(getUserMedicalHistory(user))
                 .allergies(getUserAllergies(user))
@@ -125,15 +129,37 @@ public class AiDiagnosisService {
 
     private void saveAiDiagnosis(User user, String sessionId, AiDiagnosisResponse response) {
         try {
-            AiDiagnosis diagnosis = AiDiagnosis.builder()
-                    .user(user)
-                    .sessionId(sessionId)
-                    .diagnosisResults(response.getResults().toString()) // JSON string
-                    .recommendations(String.join("; ", response.getRecommendations()))
-                    .urgencyLevel(AiDiagnosis.UrgencyLevel.valueOf(response.getUrgencyLevel()))
-                    .confidenceScore(response.getConfidenceScore())
-                    .generatedAt(LocalDateTime.now())
-                    .build();
+            AiDiagnosis diagnosis = new AiDiagnosis();
+            diagnosis.setUser(user);
+            diagnosis.setSessionId(sessionId);
+
+            // Set basic diagnosis info using existing AiDiagnosisResponse structure
+            if (response.getPrimaryConfidence() != null) {
+                diagnosis.setPrimaryConfidence(java.math.BigDecimal.valueOf(response.getPrimaryConfidence()));
+            }
+
+            // Convert recommendations to JSON string
+            if (response.getRecommendations() != null) {
+                diagnosis.setRecommendedActions(String.join("; ", response.getRecommendations()));
+            }
+
+            // Set urgency level với fallback
+            try {
+                if (response.getUrgencyLevel() != null) {
+                    diagnosis.setUrgencyLevel(
+                            AiDiagnosis.UrgencyLevel.valueOf(response.getUrgencyLevel().toLowerCase()));
+                } else {
+                    diagnosis.setUrgencyLevel(AiDiagnosis.UrgencyLevel.routine);
+                }
+            } catch (IllegalArgumentException e) {
+                diagnosis.setUrgencyLevel(AiDiagnosis.UrgencyLevel.routine);
+            }
+
+            // Set defaults for missing fields
+            diagnosis.setSpecialistReferralNeeded(false);
+            diagnosis.setFollowUpNeeded(false);
+
+            diagnosis.setCreatedAt(LocalDateTime.now());
 
             aiDiagnosisRepository.save(diagnosis);
             log.info("Saved AI diagnosis for user: {} session: {}", user.getId(), sessionId);
@@ -145,7 +171,7 @@ public class AiDiagnosisService {
     }
 
     // Helper methods
-    private Integer calculateAge(User.UserDemographic demographics) {
+    private Integer calculateAge(UserDemographic demographics) {
         if (demographics == null || demographics.getBirthYear() == null) {
             return null;
         }
@@ -153,18 +179,30 @@ public class AiDiagnosisService {
     }
 
     private List<String> getUserMedicalHistory(User user) {
-        // TODO: Implement based on your user medical history model
-        return List.of();
+        if (user.getChronicDiseases() == null) {
+            return List.of();
+        }
+        return user.getChronicDiseases().stream()
+                .map(chronic -> chronic.getDisease() != null ? chronic.getDisease().getName() : "Unknown")
+                .collect(Collectors.toList());
     }
 
     private List<String> getUserAllergies(User user) {
-        // TODO: Implement based on your user allergies model
-        return List.of();
+        if (user.getAllergies() == null) {
+            return List.of();
+        }
+        return user.getAllergies().stream()
+                .map(allergy -> allergy.getAllergen() != null ? allergy.getAllergen().getName() : "Unknown")
+                .collect(Collectors.toList());
     }
 
     private List<String> getUserCurrentMedications(User user) {
-        // TODO: Implement based on your user medications model
-        return List.of();
+        if (user.getMedications() == null) {
+            return List.of();
+        }
+        return user.getMedications().stream()
+                .map(userMed -> userMed.getMedication() != null ? userMed.getMedication().getName() : "Unknown")
+                .collect(Collectors.toList());
     }
 
     private AiDiagnosisRequest.SymptomInfo convertToSymptomInfo(UserSymptomReport report) {
@@ -175,13 +213,13 @@ public class AiDiagnosisService {
                 .frequency(report.getFrequency() != null ? report.getFrequency().toString() : null)
                 .location(report.getLocationBodyPart())
                 .description(report.getQualityDescription())
-                .triggers(report.getTriggers())
+                .triggers(report.getTriggers() != null ? List.of(report.getTriggers()) : List.of())
                 .build();
     }
 
     public List<AiDiagnosis> getUserDiagnosisHistory() {
         User currentUser = authService.getCurrentUser();
-        return aiDiagnosisRepository.findByUserOrderByGeneratedAtDesc(currentUser);
+        return aiDiagnosisRepository.findByUserOrderByCreatedAtDesc(currentUser);
     }
 
     public AiDiagnosis getDiagnosisBySession(String sessionId) {

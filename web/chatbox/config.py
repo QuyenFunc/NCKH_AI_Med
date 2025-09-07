@@ -5,7 +5,7 @@ APP_CONTEXT = {}
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key="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"
+    api_key="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"
 )
 
 def init_app_context(app):

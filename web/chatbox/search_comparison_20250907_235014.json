@@ -1,0 +1,71 @@
+{
+  "test_info": {
+    "total_queries": 15,
+    "top_k": 5,
+    "timestamp": "2025-09-07T23:50:07.592461"
+  },
+  "method_stats": {
+    "semantic": {
+      "success_rate": 1.0,
+      "avg_time": 3.952670383453369,
+      "min_time": 3.53853702545166,
+      "max_time": 4.69795560836792,
+      "median_time": 3.7694215774536133,
+      "total_results": 75,
+      "avg_results_per_query": 5.0
+    },
+    "hybrid": {
+      "success_rate": 1.0,
+      "avg_time": 5.680492130915324,
+      "min_time": 3.6493642330169678,
+      "max_time": 8.895589351654053,
+      "median_time": 4.7705078125,
+      "total_results": 75,
+      "avg_results_per_query": 5.0
+    },
+    "parallel": {
+      "success_rate": 0,
+      "avg_time": 0,
+      "error": "No successful queries"
+    },
+    "fast_hybrid": {
+      "success_rate": 0,
+      "avg_time": 0,
+      "error": "No successful queries"
+    }
+  },
+  "detailed_results": [
+    {
+      "query": "đau đầu và chóng mặt",
+      "timestamp": "2025-09-07T23:47:43.063760",
+      "methods": {
+        "semantic": {
+          "method": "semantic",
+          "success": true,
+          "results_count": 5,
+          "search_time": 4.0460710525512695,
+          "results": [
+            {
+              "text": "Tên bệnh: Migraine with aura\nMã ICD: 8A80.1\nĐịnh nghĩa: Recurrent attacks, lasting minutes, of unilateral fully-reversible visual, sensory or other central nervous system symptoms that usually develop gradually and are usually followed by headache and associated migraine symptoms.\n🔗 Xem chi tiết: https://icd.who.int/browse/2025-01/mms/en#525744634",
+              "metadata": {
+                "source_type": "icd_entity",
+                "entity_name": "Migraine with aura",
+                "entity_uri": "http://id.who.int/icd/release/11/2025-01/mms/525744634",
+                "entity_code": "525744634",
+                "data_type": "medical_diagnosis",
+                "chunk_index": 0,
+                "chunk_size": 349,
+                "total_chunks": 1,
+                "fetch_timestamp": "2025-09-07T02:10:07.744633",
+                "entity_type": "medical_condition",
+                "chunk_type": "diagnosis_info",
+                "has_definition": true,
+                "has_diagnostic_criteria": false,
+                "has_icd_code": true,
+                "has_index_terms": false,
+                "has_inclusions": false,
+                "has_exclusions": false,
+                "browser_url": "https://icd.who.int/browse/2025-01/mms/en#525744634",
+                "quality_score": 67
+              },
+              "distance": 

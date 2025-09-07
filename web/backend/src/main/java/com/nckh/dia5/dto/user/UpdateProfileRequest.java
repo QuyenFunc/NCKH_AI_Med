@@ -44,4 +44,20 @@ public class UpdateProfileRequest {
     private String occupation;
 
     private UserDemographic.EducationLevel educationLevel;
+
+    // Lifestyle and health information
+    @Size(max = 1000, message = "Tiền sử bệnh không được quá 1000 ký tự")
+    private String medicalHistory;
+
+    @Size(max = 500, message = "Thông tin dị ứng không được quá 500 ký tự")
+    private String allergies;
+
+    @Size(max = 500, message = "Thông tin thuốc không được quá 500 ký tự")
+    private String currentMedications;
+
+    @Size(max = 20, message = "Trạng thái hút thuốc không hợp lệ")
+    private String smokingStatus;
+
+    @Size(max = 20, message = "Trạng thái uống rượu không hợp lệ")
+    private String drinkingStatus;
 }

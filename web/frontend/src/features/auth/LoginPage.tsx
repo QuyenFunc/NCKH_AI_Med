@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { 
   Mail, 
   Lock, 
@@ -8,24 +11,47 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import type { LoginRequest } from '../../types';
 import './styles/LoginPage.css';
 
 const LoginPage: React.FC = () => {
-  const { login, switchToRegister } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { login, switchToRegister, error, clearError, isLoading, authMode } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      login(email, password);
-      setIsLoading(false);
-    }, 1500);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+    clearErrors,
+  } = useForm<LoginRequest>();
+
+  // Chuyển hướng nếu đã đăng nhập
+  useEffect(() => {
+    if (authMode === 'authenticated') {
+      navigate('/dashboard');
+    }
+  }, [authMode, navigate]);
+
+  // Xử lý error từ context
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      clearError();
+    }
+  }, [error, clearError]);
+
+  const onSubmit = async (data: LoginRequest) => {
+    try {
+      clearErrors();
+      await login(data.email, data.password);
+      toast.success('Đăng nhập thành công!');
+      navigate('/dashboard');
+    } catch (error) {
+      // Error đã được xử lý trong AuthContext và hiển thị qua useEffect
+      console.error('Login failed:', error);
+    }
   };
 
   const togglePasswordVisibility = () => {
@@ -47,7 +73,7 @@ const LoginPage: React.FC = () => {
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="login-form">
+        <form onSubmit={handleSubmit(onSubmit)} className="login-form">
           <div className="form-group">
             <label htmlFor="email" className="form-label">
               Email
@@ -57,13 +83,20 @@ const LoginPage: React.FC = () => {
               <input
                 type="email"
                 id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="form-input"
+                {...register('email', {
+                  required: 'Email không được để trống',
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: 'Email không đúng định dạng'
+                  }
+                })}
+                className={`form-input ${errors.email ? 'error' : ''}`}
                 placeholder=""
-                required
               />
             </div>
+            {errors.email && (
+              <span className="error-message">{errors.email.message}</span>
+            )}
           </div>
 
           <div className="form-group">
@@ -75,11 +108,15 @@ const LoginPage: React.FC = () => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="form-input"
+                {...register('password', {
+                  required: 'Mật khẩu không được để trống',
+                  minLength: {
+                    value: 6,
+                    message: 'Mật khẩu phải có ít nhất 6 ký tự'
+                  }
+                })}
+                className={`form-input ${errors.password ? 'error' : ''}`}
                 placeholder=""
-                required
               />
               <button
                 type="button"
@@ -90,6 +127,9 @@ const LoginPage: React.FC = () => {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
+            {errors.password && (
+              <span className="error-message">{errors.password.message}</span>
+            )}
           </div>
 
           <div className="form-options">
@@ -108,10 +148,10 @@ const LoginPage: React.FC = () => {
           <div className="form-actions">
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isSubmitting || isLoading}
               className="login-btn"
             >
-              {isLoading ? (
+              {(isSubmitting || isLoading) ? (
                 <>
                   <div className="loading-spinner" />
                   Đang đăng nhập...

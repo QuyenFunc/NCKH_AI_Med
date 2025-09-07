@@ -169,7 +169,7 @@ class MedicalStructuredExtractor:
         
         try:
             response = client.chat.completions.create(
-                model="deepseek/deepseek-r1:free",
+                model="deepseek/deepseek-chat-v3.1:free",
                 messages=[{"role": "user", "content": extraction_prompt}],
                 max_tokens=2000,
                 temperature=0.1

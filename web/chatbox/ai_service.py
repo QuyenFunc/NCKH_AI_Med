@@ -13,8 +13,8 @@ class MedicalAIService:
     
     def __init__(self):
         self.client = client
-        self.model = "deepseek/deepseek-chat"  # Free model on OpenRouter
-        self.max_tokens = 500  # Reduce for faster response
+        self.model = "deepseek/deepseek-chat-v3.1:free"  # Free model on OpenRouter
+        self.max_tokens = 2000  # Reduce for faster response
         self.temperature = 0.7
         
         # Add caching to reduce API calls
@@ -127,7 +127,7 @@ Phân tích và trả về JSON:"""
             return self._fallback_intent_classification(query)
     
     def generate_medical_response(self, query: str, search_results: List[Dict], 
-                                 intent_info: Dict, context: Dict = None) -> Dict[str, Any]:
+                                 intent_info: Dict, context: Dict = None, stream: bool = False):
         """Sử dụng AI để tạo response thông minh dựa trên search results"""
         
         start_time = time.time()
@@ -222,37 +222,95 @@ Các thực thể y tế quan trọng: {', '.join(intent_info.get('key_entities'
 Hãy đưa ra lời khuyên y tế phù hợp dựa trên thông tin trên:"""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                max_tokens=self.max_tokens,
-                temperature=self.temperature
-            )
-            
-            ai_response = response.choices[0].message.content.strip()
-            response_time = time.time() - start_time
-            self._update_response_time(response_time)
-            
-            print(f"🤖 AI Response generated in {response_time:.2f}s")
-            
-            return {
-                'response': ai_response,
-                'ai_generated': True,
-                'response_time': response_time,
-                'intent': intent,
-                'urgency_level': urgency,
-                'model': self.model
-            }
+            if stream:
+                # STREAMING MODE - Return generator
+                stream_response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature,
+                    stream=True  # Enable real streaming!
+                )
+                
+                full_response = ""
+                for chunk in stream_response:
+                    if chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
+                        full_response += content
+                        yield {
+                            'type': 'chunk',
+                            'content': content,
+                            'full_response': full_response,
+                            'intent': intent,
+                            'urgency_level': urgency
+                        }
+                
+                # Final response data
+                response_time = time.time() - start_time
+                self._update_response_time(response_time)
+                
+                print(f"🤖 AI Streaming completed in {response_time:.2f}s")
+                
+                yield {
+                    'type': 'final',
+                    'response': full_response,
+                    'ai_generated': True,
+                    'response_time': response_time,
+                    'intent': intent,
+                    'urgency_level': urgency,
+                    'model': self.model
+                }
+                
+            else:
+                # NON-STREAMING MODE - Original blocking behavior
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature
+                )
+                
+                ai_response = response.choices[0].message.content.strip()
+                response_time = time.time() - start_time
+                self._update_response_time(response_time)
+                
+                print(f"🤖 AI Response generated in {response_time:.2f}s")
+                
+                return {
+                    'response': ai_response,
+                    'ai_generated': True,
+                    'response_time': response_time,
+                    'intent': intent,
+                    'urgency_level': urgency,
+                    'model': self.model
+                }
             
         except Exception as e:
             print(f"⚠️ AI Response generation failed: {e}")
             self.stats['errors'] += 1
             
             # Fallback to template response
-            return self._fallback_response_generation(query, search_results, intent_info)
+            fallback_result = self._fallback_response_generation(query, search_results, intent_info)
+            
+            if stream:
+                yield {
+                    'type': 'final',
+                    'response': fallback_result['response'],
+                    'ai_generated': False,
+                    'response_time': fallback_result.get('response_time', 0),
+                    'intent': intent,
+                    'urgency_level': urgency,
+                    'error': str(e),
+                    'model': self.model
+                }
+            else:
+                return fallback_result
     
     def _fallback_intent_classification(self, query: str) -> Dict[str, Any]:
         """Fallback rule-based intent classification"""

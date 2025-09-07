@@ -21,8 +21,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 }) => {
   return (
     <div className="chat-window">
+      {/* Loading Screen */}
+      {isLoading && messages.length === 0 && (
+        <div className="loading-screen">
+          <div className="loading-content">
+            <div className="loading-spinner"></div>
+            <p>Đang tải lịch sử chat...</p>
+          </div>
+        </div>
+      )}
+      
       {/* Welcome Screen */}
-      {messages.length === 0 && (
+      {!isLoading && messages.length === 0 && (
         <div className="welcome-screen">
           <div className="welcome-content">
             {/* <div className="welcome-icon">

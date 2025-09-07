@@ -29,8 +29,7 @@ public interface NewsArticleRepository extends JpaRepository<NewsArticle, Intege
     @Query("SELECT na FROM NewsArticle na WHERE na.publicationDate >= :since ORDER BY na.publicationDate DESC")
     Page<NewsArticle> findRecentArticles(@Param("since") LocalDateTime since, Pageable pageable);
 
-    @Query(value = "SELECT * FROM news_articles na WHERE " +
-            "MATCH(na.title, na.summary, na.content) AGAINST(:keyword IN NATURAL LANGUAGE MODE)", nativeQuery = true)
+    @Query("SELECT na FROM NewsArticle na WHERE na.title LIKE %:keyword% OR na.summary LIKE %:keyword% OR na.content LIKE %:keyword% ORDER BY na.publicationDate DESC")
     Page<NewsArticle> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
     @Query("SELECT na FROM NewsArticle na ORDER BY na.viewCount DESC")

@@ -19,8 +19,7 @@ public interface SymptomRepository extends JpaRepository<Symptom, Integer> {
     @Query("SELECT s FROM Symptom s WHERE s.severityScale = :scale ORDER BY s.name")
     List<Symptom> findBySeverityScale(@Param("scale") Symptom.SeverityScale scale);
 
-    @Query(value = "SELECT * FROM symptoms s WHERE " +
-            "MATCH(s.name, s.category) AGAINST(:keyword IN NATURAL LANGUAGE MODE)", nativeQuery = true)
+    @Query("SELECT s FROM Symptom s WHERE s.name LIKE %:keyword% OR s.category LIKE %:keyword% ORDER BY s.name")
     Page<Symptom> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
     @Query("SELECT DISTINCT s.category FROM Symptom s WHERE s.category IS NOT NULL ORDER BY s.category")

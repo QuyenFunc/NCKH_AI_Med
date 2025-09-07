@@ -1,5 +1,6 @@
 package com.nckh.dia5.repository;
 
+import com.nckh.dia5.model.User;
 import com.nckh.dia5.model.UserSymptomReport;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,4 +36,8 @@ public interface UserSymptomReportRepository extends JpaRepository<UserSymptomRe
 
     @Query("SELECT DISTINCT usr.sessionId FROM UserSymptomReport usr WHERE usr.user.id = :userId ORDER BY MAX(usr.reportedAt) DESC")
     List<String> findDistinctSessionIdsByUserId(@Param("userId") String userId);
+
+    // Additional methods for AiDiagnosisService
+    @Query("SELECT usr FROM UserSymptomReport usr WHERE usr.user = :user AND usr.sessionId = :sessionId ORDER BY usr.reportedAt DESC")
+    List<UserSymptomReport> findByUserAndSessionId(@Param("user") User user, @Param("sessionId") String sessionId);
 }

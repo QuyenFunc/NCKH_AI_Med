@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -14,28 +13,27 @@ import java.util.List;
 @AllArgsConstructor
 public class AiDiagnosisResponse {
 
-    private String diagnosisId;
     private String sessionId;
     private List<DiagnosisResult> results;
     private List<String> recommendations;
-    private String urgencyLevel;
-    private Double confidenceScore;
-    private LocalDateTime generatedAt;
-    private String disclaimerMessage;
+    private String urgencyLevel; // emergency, urgent, routine, self_care
+    private Double primaryConfidence; // 0.0 to 1.0
+    private Boolean needsSpecialistReferral;
+    private Boolean needsFollowUp;
+    private String followUpTimeframe;
+    private Integer processingTimeMs;
+    private String aiModelVersion;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class DiagnosisResult {
-        private String diseaseName;
-        private String diseaseCode;
-        private Double probability;
-        private String description;
-        private String severity;
-        private List<String> matchedSymptoms;
-        private List<String> additionalQuestions;
-        private String recommendedSpecialty;
-        private Boolean requiresImmediateAttention;
+        private String conditionName;
+        private String icdCode;
+        private Double confidence;
+        private String reasoning;
+        private List<String> symptoms;
+        private String specialtyRecommended;
     }
 }

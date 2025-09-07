@@ -1,12 +1,15 @@
 package com.nckh.dia5.repository;
 
 import com.nckh.dia5.model.ChatSession;
+import com.nckh.dia5.model.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -38,4 +41,11 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, String
 
     @Query("SELECT AVG(cs.satisfactionRating) FROM ChatSession cs WHERE cs.satisfactionRating IS NOT NULL")
     Double findAverageSatisfactionRating();
+
+    // Additional methods for ChatService
+    @Query("SELECT cs FROM ChatSession cs WHERE cs.user = :user ORDER BY cs.startedAt DESC")
+    List<ChatSession> findByUserOrderByStartedAtDesc(@Param("user") User user);
+
+    @Query("SELECT cs FROM ChatSession cs WHERE cs.id = :sessionId AND cs.user = :user")
+    Optional<ChatSession> findByIdAndUser(@Param("sessionId") String sessionId, @Param("user") User user);
 }
