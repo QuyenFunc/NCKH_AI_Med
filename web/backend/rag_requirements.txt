@@ -1,0 +1,48 @@
+# Core RAG Dependencies
+sentence-transformers==2.2.2
+faiss-cpu==1.7.4
+# faiss-gpu==1.7.4  # Use this instead if you have GPU
+
+# Data Processing
+pandas==1.5.3
+numpy==1.24.3
+scikit-learn==1.3.0
+
+# Web Scraping & API
+requests==2.31.0
+beautifulsoup4==4.12.2
+scrapy==2.10.1  # For advanced web scraping
+
+# Natural Language Processing
+transformers==4.30.2
+torch==2.0.1
+spacy==3.6.0
+# python -m spacy download en_core_web_sm
+# python -m spacy download vi_core_news_sm  # Vietnamese model
+
+# Vietnamese NLP (Optional)
+underthesea==6.7.0  # Vietnamese text processing
+pyvi==0.1.1  # Vietnamese word segmentation
+
+# Flask API
+flask==2.3.2
+flask-cors==4.0.0
+flask-restful==0.3.10
+
+# Database (if needed)
+pymongo==4.4.1  # For MongoDB
+redis==4.6.0    # For caching
+
+# Utilities
+python-dotenv==1.0.0
+tqdm==4.65.0
+openpyxl==3.1.2  # For Excel files
+
+# Medical/Healthcare specific
+medspacy==0.2.0  # Medical NLP
+clinicaltrials==1.2.0  # Clinical trials data
+
+# Evaluation & Monitoring
+wandb==0.15.5  # For experiment tracking
+mlflow==2.5.0  # ML lifecycle management
+
