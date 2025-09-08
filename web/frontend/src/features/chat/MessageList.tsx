@@ -20,6 +20,12 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading }) => {
     scrollToBottom();
   }, [messages, isLoading]);
 
+  // ✅ Check if there's any streaming message
+  const hasStreamingMessage = messages.some(msg => msg.isStreaming);
+
+  // ✅ Only show typing indicator if loading AND no streaming message exists
+  const shouldShowTypingIndicator = isLoading && !hasStreamingMessage;
+
   return (
     <div className="message-list">
       <div className="message-list-container">
@@ -27,7 +33,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading }) => {
           <Message key={message.id} message={message} />
         ))}
         
-        {isLoading && (
+        {shouldShowTypingIndicator && (
           <div className="typing-indicator">
             <div className="typing-avatar">
               <MessageSquare size={16} />

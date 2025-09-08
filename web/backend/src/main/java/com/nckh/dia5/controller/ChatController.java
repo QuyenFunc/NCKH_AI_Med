@@ -114,7 +114,8 @@ public class ChatController {
                     sessionId,
                     message,
                     request.getConfidence(),
-                    request.getProcessingTime());
+                    request.getProcessingTime(),
+                    request.getSourcesJson()); // ✅ NEW: Pass sources
 
             return ResponseEntity.ok(ApiResponse.success(aiMessage, "Phản hồi AI đã được lưu"));
 
@@ -265,9 +266,9 @@ public class ChatController {
 
     public static class SaveAiResponseRequest {
         private String message;
-
         private Double confidence;
         private Integer processingTime;
+        private String sourcesJson; // ✅ NEW: Sources as JSON string
 
         public String getMessage() {
             return message;
@@ -291,6 +292,15 @@ public class ChatController {
 
         public void setProcessingTime(Integer processingTime) {
             this.processingTime = processingTime;
+        }
+
+        // ✅ NEW: Sources getter/setter
+        public String getSourcesJson() {
+            return sourcesJson;
+        }
+
+        public void setSourcesJson(String sourcesJson) {
+            this.sourcesJson = sourcesJson;
         }
     }
 }

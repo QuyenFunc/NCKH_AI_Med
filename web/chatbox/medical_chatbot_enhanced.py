@@ -793,16 +793,16 @@ Dựa trên thông tin y khoa hiện có, tôi khuyến nghị bạn:
         search_method = "unknown"
         
 
-            search_results = search_medical_symptoms_and_diseases(search_query, top_k=5)
-            search_time = time.time() - search_start_time
-            search_method = "fallback_semantic"
-            print(f"🔄 Fallback semantic: {len(search_results)} results in {search_time:.2f}s")
+        search_results = search_medical_symptoms_and_diseases(search_query, top_k=5)
+        search_time = time.time() - search_start_time
+        search_method = "fallback_semantic"
+        print(f"🔄 Fallback semantic: {len(search_results)} results in {search_time:.2f}s")
         print(search_results)
         self.stats['search_times'].append(search_time)
         
         # 13. AI-powered response generation
         response_start_time = time.time()
-                response_data = {
+        response_data = {
             "intent_info" : intent_info,
             "intent": intent,  # ✅ intent đã là string rồi, không cần ['intent']
             "confidence": intent_info['confidence'],  # ✅ confidence nằm trong intent_info

@@ -22,6 +22,7 @@ export interface BackendChatMessage {
   processingTimeMs?: number;
   sentimentScore?: number;
   containsUrgencyKeywords: boolean;
+  sourcesJson?: string; // ✅ NEW: Sources as JSON string
   timestamp: string;
 }
 
@@ -96,9 +97,20 @@ export class BackendService {
     sessionId: string, 
     message: string, 
     confidence?: number, 
-    processingTime?: number
+    processingTime?: number,
+    sources?: any[] // ✅ NEW: Accept sources array
   ): Promise<BackendChatMessage> {
     try {
+      // ✅ Convert sources to JSON string if provided
+      let sourcesJson: string | undefined;
+      if (sources && sources.length > 0) {
+        try {
+          sourcesJson = JSON.stringify(sources);
+        } catch (error) {
+          console.warn('Failed to stringify sources:', error);
+        }
+      }
+
       const response = await fetch(`${BACKEND_API_BASE}/chat/sessions/${sessionId}/ai-response`, {
         method: 'POST',
         headers: {
@@ -108,7 +120,8 @@ export class BackendService {
         body: JSON.stringify({ 
           message, 
           confidence, 
-          processingTime 
+          processingTime,
+          sourcesJson // ✅ NEW: Send sources as JSON
         }),
       });
 

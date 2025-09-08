@@ -22,6 +22,7 @@ public class ChatMessageResponse {
     private Integer processingTimeMs;
     private Double sentimentScore;
     private Boolean containsUrgencyKeywords;
+    private String sourcesJson; // ✅ NEW: Sources as JSON string
     private LocalDateTime timestamp;
 
     /**
@@ -38,6 +39,7 @@ public class ChatMessageResponse {
                 .processingTimeMs(message.getProcessingTimeMs())
                 .sentimentScore(message.getSentimentScore() != null ? message.getSentimentScore().doubleValue() : null)
                 .containsUrgencyKeywords(message.getContainsUrgencyKeywords())
+                .sourcesJson(message.getSourcesJson()) // ✅ NEW: Map sources
                 .timestamp(message.getTimestamp())
                 .build();
     }
