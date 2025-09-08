@@ -54,6 +54,10 @@ public class ChatMessage {
     @Column(name = "contains_urgency_keywords", nullable = false)
     private Boolean containsUrgencyKeywords = false;
 
+    // ✅ NEW: Store sources and metadata as JSON
+    @Column(name = "sources_json", columnDefinition = "TEXT")
+    private String sourcesJson;
+
     @CreatedDate
     @Column(name = "timestamp", nullable = false, updatable = false)
     private LocalDateTime timestamp;

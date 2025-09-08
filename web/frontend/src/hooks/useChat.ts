@@ -78,6 +78,18 @@ export const useChat = (onSessionCreated?: (sessionId: string) => void): UseChat
     if (backendMsg.processingTimeMs !== undefined) {
       metadata.processingTime = backendMsg.processingTimeMs;
     }
+
+    // ✅ NEW: Parse sources from JSON
+    if (backendMsg.sourcesJson) {
+      try {
+        const parsedSources = JSON.parse(backendMsg.sourcesJson);
+        if (Array.isArray(parsedSources) && parsedSources.length > 0) {
+          metadata.sources = parsedSources;
+        }
+      } catch (error) {
+        logger.warn('Failed to parse sources JSON:', backendMsg.sourcesJson, error);
+      }
+    }
     
     return {
       id: `backend_${backendMsg.id}`,
@@ -221,6 +233,10 @@ export const useChat = (onSessionCreated?: (sessionId: string) => void): UseChat
       return;
     }
 
+    // ✅ Reset all ref variables at the beginning to prevent race conditions
+    isStreamingCompleteRef.current = false;
+    lastMessageRef.current = null;
+
     // ✅ Auto-create session if none exists (like ChatGPT)
     if (!sessionId) {
       logger.info('No session exists, creating new one automatically');
@@ -232,20 +248,15 @@ export const useChat = (onSessionCreated?: (sessionId: string) => void): UseChat
       }
     }
 
-    // ✅ Prevent duplicate messages
-    if (lastMessageRef.current === query) {
-      logger.warn('Duplicate message detected, ignoring');
-      return;
-    }
-
     try {
       setIsLoading(true);
       setError(null);
-      lastMessageRef.current = query;
+      lastMessageRef.current = query; // ✅ Set after reset to enable proper duplicate detection
       
       // Cancel any ongoing requests
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
+        abortControllerRef.current = null; // ✅ Clear reference
       }
       
       logger.info('🚀 Starting new chat session');
@@ -274,6 +285,9 @@ export const useChat = (onSessionCreated?: (sessionId: string) => void): UseChat
 
       setMessages(prev => [...prev, assistantMessage]);
 
+      // ✅ Set loading to false immediately after creating streaming message to avoid double loading indicators
+      setIsLoading(false);
+
       // ✅ Reset variables for each new chat
       let accumulatedContent = '';
       let chatMetadata: ChatMetadata = {};
@@ -286,8 +300,9 @@ export const useChat = (onSessionCreated?: (sessionId: string) => void): UseChat
           sessionId,
           {
             onChunk: (chunkData) => {
-              // Check if request was aborted or already completed
+              // ✅ Enhanced check for request state - more robust than before
               if (abortControllerRef.current?.signal.aborted || isStreamingCompleteRef.current) {
+                logger.info('Chunk received but streaming already completed/aborted, ignoring');
                 return;
               }
               
@@ -327,7 +342,8 @@ export const useChat = (onSessionCreated?: (sessionId: string) => void): UseChat
                       sessionId, 
                       accumulatedContent,
                       finalData.confidence,
-                      finalData.processing_time || 0
+                      finalData.processing_time || 0,
+                      finalData.sources || [] // ✅ NEW: Pass sources array
                     );
                   } else {
                     logger.warn('No content to save for AI response');
@@ -367,6 +383,8 @@ export const useChat = (onSessionCreated?: (sessionId: string) => void): UseChat
               
               // Remove the incomplete assistant message
               setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
+              
+              // ✅ Note: isLoading already set to false when assistant message was created
             }
           }
         );
@@ -383,19 +401,20 @@ export const useChat = (onSessionCreated?: (sessionId: string) => void): UseChat
         
         // Remove the incomplete assistant message
         setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
+        
+        // ✅ Ensure loading is false on stream error
+        setIsLoading(false);
       }
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Có lỗi xảy ra khi gửi tin nhắn';
       setError(errorMessage);
       console.error('Error sending message:', err);
-    } finally {
+      // ✅ Ensure loading is false on any error
       setIsLoading(false);
-      // ✅ Clear last message ref after completion
-      lastMessageRef.current = null;
-      // ✅ Reset streaming complete flag for next message
-      isStreamingCompleteRef.current = false;
     }
+    // ✅ Note: setIsLoading(false) is now called earlier when assistant message is created
+    // or in catch block if error occurs before streaming starts
   }, [sessionId, isLoading, startNewSession]);
 
   // ✅ Initialize session on mount - only if no existing session
@@ -417,7 +436,11 @@ export const useChat = (onSessionCreated?: (sessionId: string) => void): UseChat
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
+        abortControllerRef.current = null;
       }
+      // ✅ Reset all ref variables on unmount
+      lastMessageRef.current = null;
+      isStreamingCompleteRef.current = false;
     };
   }, [isInitialized, loadExistingSession]);
 

@@ -89,7 +89,7 @@ public class ChatService {
      * Lưu AI response vào database
      */
     public ChatMessage saveAiMessage(String sessionId, String messageText,
-            Double confidence, Integer processingTime) {
+            Double confidence, Integer processingTime, String sourcesJson) {
         try {
             ChatSession session = getChatSession(sessionId);
 
@@ -106,6 +106,10 @@ public class ChatService {
             }
             if (processingTime != null) {
                 message.setProcessingTimeMs(processingTime);
+            }
+            // ✅ NEW: Set sources JSON
+            if (sourcesJson != null && !sourcesJson.trim().isEmpty()) {
+                message.setSourcesJson(sourcesJson);
             }
 
             ChatMessage savedMessage = chatMessageRepository.save(message);
