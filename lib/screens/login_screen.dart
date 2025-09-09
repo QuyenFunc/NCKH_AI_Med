@@ -32,19 +32,19 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final success = await AuthService.instance.login(
+      final result = await AuthService.instance.login(
         _emailController.text.trim(),
         _passwordController.text,
       );
 
-      if (success && mounted) {
+      if (result.isSuccess && mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const MainScreen()),
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Email hoặc mật khẩu không chính xác'),
+          SnackBar(
+            content: Text(result.error ?? 'Email hoặc mật khẩu không chính xác'),
             backgroundColor: Colors.red,
           ),
         );
@@ -300,3 +300,9 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
+
+
+
+
+

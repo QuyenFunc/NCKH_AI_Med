@@ -1,30 +1,35 @@
 class User {
   final String id;
   final String email;
-  final String? name;
-  final DateTime createdAt;
+  final String name;
+  final DateTime? createdAt;
   final DateTime? lastLoginAt;
   final bool isProfileComplete;
+  final bool isActive;
 
   User({
     required this.id,
     required this.email,
-    this.name,
-    required this.createdAt,
+    required this.name,
+    this.createdAt,
     this.lastLoginAt,
     this.isProfileComplete = false,
+    this.isActive = true,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'] ?? '',
       email: json['email'] ?? '',
-      name: json['name'],
-      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
-      lastLoginAt: json['last_login_at'] != null 
-        ? DateTime.tryParse(json['last_login_at'])
+      name: json['name'] ?? '',
+      createdAt: json['createdAt'] != null 
+        ? DateTime.tryParse(json['createdAt'])
         : null,
-      isProfileComplete: json['is_profile_complete'] ?? false,
+      lastLoginAt: json['lastLoginAt'] != null 
+        ? DateTime.tryParse(json['lastLoginAt'])
+        : null,
+      isProfileComplete: json['isProfileComplete'] ?? false,
+      isActive: json['isActive'] ?? true,
     );
   }
 
@@ -33,9 +38,10 @@ class User {
       'id': id,
       'email': email,
       'name': name,
-      'created_at': createdAt.toIso8601String(),
-      'last_login_at': lastLoginAt?.toIso8601String(),
-      'is_profile_complete': isProfileComplete,
+      'createdAt': createdAt?.toIso8601String(),
+      'lastLoginAt': lastLoginAt?.toIso8601String(),
+      'isProfileComplete': isProfileComplete,
+      'isActive': isActive,
     };
   }
 
@@ -46,6 +52,7 @@ class User {
     DateTime? createdAt,
     DateTime? lastLoginAt,
     bool? isProfileComplete,
+    bool? isActive,
   }) {
     return User(
       id: id ?? this.id,
@@ -54,6 +61,10 @@ class User {
       createdAt: createdAt ?? this.createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
       isProfileComplete: isProfileComplete ?? this.isProfileComplete,
+      isActive: isActive ?? this.isActive,
     );
   }
 }
+
+
+

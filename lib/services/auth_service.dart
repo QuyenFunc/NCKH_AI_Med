@@ -1,21 +1,19 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../models/user_profile.dart';
+import 'api_service.dart';
 
 class AuthService {
   static const String _userKey = 'current_user';
   static const String _profileKey = 'user_profile';
-  static const String _tokenKey = 'auth_token';
-  
-  // Backend API endpoint (use 10.0.2.2 for Android emulator)
-  static const String _baseUrl = 'http://10.0.2.2:8080/api';
   
   static AuthService? _instance;
   static AuthService get instance => _instance ??= AuthService._();
   AuthService._();
 
+  final ApiService _apiService = ApiService.instance;
+  
   User? _currentUser;
   UserProfile? _currentProfile;
 
@@ -30,129 +28,150 @@ class AuthService {
   }
 
   // Login with email and password
-  Future<bool> login(String email, String password) async {
+  Future<AuthResult> login(String email, String password) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
+      final response = await _apiService.post(
+        '/auth/login',
+        {
           'email': email,
           'password': password,
-        }),
+        },
+        requireAuth: false,
+        fromJson: (data) => AuthResponseData.fromJson(data),
       );
       
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final userData = data['data'];
-        final token = data['token'];
+      if (response.isSuccess && response.data != null) {
+        final authData = response.data!;
         
-        _currentUser = User.fromJson(userData);
+        // Save token
+        await _apiService.saveAuthToken(authData.accessToken);
+        
+        // Save user data
+        _currentUser = User(
+          id: authData.user.id,
+          email: authData.user.email,
+          name: authData.user.name,
+          isProfileComplete: authData.user.isProfileComplete,
+          isActive: authData.user.isActive,
+        );
         await _saveUserToStorage(_currentUser!);
-        await _saveToken(token);
         
         // Load user profile if exists
-        await _loadUserProfile(_currentUser!.id);
+        if (authData.user.isProfileComplete) {
+          await _loadUserProfile(_currentUser!.id);
+        }
         
-        return true;
+        return AuthResult.success();
+      } else {
+        return AuthResult.error(response.error ?? 'Đăng nhập thất bại');
       }
-      return false;
     } catch (e) {
       print('Login error: $e');
-      return false;
+      return AuthResult.error('Đã có lỗi xảy ra khi đăng nhập');
     }
   }
 
   // Register new user
-  Future<bool> register(String email, String password, String? name) async {
+  Future<AuthResult> register(String email, String password, String confirmPassword, String? name) async {
     try {
       print('Attempting to register user: $email');
       
-      final response = await http.post(
-        Uri.parse('$_baseUrl/auth/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
+      final response = await _apiService.post(
+        '/auth/register',
+        {
           'email': email,
           'password': password,
+          'confirmPassword': confirmPassword,
           'name': name ?? '',
-        }),
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw Exception('Request timeout - Backend không phản hồi');
         },
+        requireAuth: false,
+        fromJson: (data) => AuthResponseData.fromJson(data),
       );
       
-      print('Register response status: ${response.statusCode}');
-      print('Register response body: ${response.body}');
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = json.decode(response.body);
-        final userData = data['data'];
-        final token = data['token'];
+      if (response.isSuccess && response.data != null) {
+        final authData = response.data!;
         
-        _currentUser = User.fromJson(userData);
+        // Save token
+        await _apiService.saveAuthToken(authData.accessToken);
+        
+        // Save user data
+        _currentUser = User(
+          id: authData.user.id,
+          email: authData.user.email,
+          name: authData.user.name,
+          isProfileComplete: authData.user.isProfileComplete,
+          isActive: authData.user.isActive,
+        );
         await _saveUserToStorage(_currentUser!);
-        await _saveToken(token);
+        
         print('Register successful for user: ${_currentUser!.email}');
-        return true;
+        return AuthResult.success();
       } else {
-        print('Register failed with status: ${response.statusCode}');
-        print('Error response: ${response.body}');
-        return false;
+        print('Register failed: ${response.error}');
+        return AuthResult.error(response.error ?? 'Đăng ký thất bại');
       }
     } catch (e) {
       print('Register error: $e');
-      return false;
+      return AuthResult.error('Đã có lỗi xảy ra khi đăng ký');
     }
   }
 
   // Save user profile
-  Future<bool> saveProfile(UserProfile profile) async {
+  Future<AuthResult> saveProfile(UserProfile profile) async {
     try {
-      final token = await _getToken();
-      if (token == null) return false;
-
-      final response = await http.post(
-        Uri.parse('$_baseUrl/users/profile'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: json.encode(profile.toJson()),
+      final response = await _apiService.put(
+        '/users/profile',
+        profile.toJson(),
       );
       
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.isSuccess) {
         _currentProfile = profile;
         await _saveProfileToStorage(profile);
         
         // Update user's profile complete status
         if (_currentUser != null && profile.isComplete) {
-          _currentUser = _currentUser!.copyWith(isProfileComplete: true);
+          _currentUser = User(
+            id: _currentUser!.id,
+            email: _currentUser!.email,
+            name: _currentUser!.name,
+            isProfileComplete: true,
+            isActive: _currentUser!.isActive,
+          );
           await _saveUserToStorage(_currentUser!);
         }
         
-        return true;
+        return AuthResult.success();
+      } else {
+        return AuthResult.error(response.error ?? 'Lưu profile thất bại');
       }
-      return false;
     } catch (e) {
       print('Save profile error: $e');
-      return false;
+      return AuthResult.error('Đã có lỗi xảy ra khi lưu profile');
     }
   }
 
   // Logout
   Future<void> logout() async {
+    // Call logout API
+    try {
+      await _apiService.post('/auth/logout', {});
+    } catch (e) {
+      print('Logout API error: $e');
+      // Continue with local logout even if API fails
+    }
+    
+    // Clear local data
     _currentUser = null;
     _currentProfile = null;
     
+    // Clear storage
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userKey);
     await prefs.remove(_profileKey);
-    await prefs.remove(_tokenKey);
+    await _apiService.clearAuthToken();
   }
 
   // Private methods
-
   Future<void> _saveUserToStorage(User user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userKey, json.encode(user.toJson()));
@@ -164,16 +183,6 @@ class AuthService {
     if (userJson != null) {
       _currentUser = User.fromJson(json.decode(userJson));
     }
-  }
-
-  Future<void> _saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
-  }
-
-  Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
   }
 
   Future<void> _saveProfileToStorage(UserProfile profile) async {
@@ -191,19 +200,11 @@ class AuthService {
 
   Future<void> _loadUserProfile(String userId) async {
     try {
-      final token = await _getToken();
-      if (token == null) return;
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl/users/me'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      );
+      final response = await _apiService.get('/auth/me');
       
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final profileData = data['data']['profile'];
+      if (response.isSuccess && response.data != null) {
+        final userData = response.data as Map<String, dynamic>;
+        final profileData = userData['profile'];
         if (profileData != null) {
           _currentProfile = UserProfile.fromJson(profileData);
           await _saveProfileToStorage(_currentProfile!);
@@ -214,4 +215,93 @@ class AuthService {
     }
   }
 
+  // Get current user info from backend
+  Future<User?> getCurrentUserInfo() async {
+    try {
+      final response = await _apiService.get('/auth/me');
+      
+      if (response.isSuccess && response.data != null) {
+        final userData = response.data as Map<String, dynamic>;
+        final user = User(
+          id: userData['id'],
+          email: userData['email'],
+          name: userData['name'],
+          isProfileComplete: userData['isProfileComplete'] ?? false,
+          isActive: userData['isActive'] ?? true,
+        );
+        
+        _currentUser = user;
+        await _saveUserToStorage(user);
+        
+        return user;
+      }
+    } catch (e) {
+      print('Get current user error: $e');
+    }
+    return null;
+  }
+}
+
+// Auth result wrapper
+class AuthResult {
+  final bool success;
+  final String? error;
+
+  AuthResult._({required this.success, this.error});
+
+  factory AuthResult.success() => AuthResult._(success: true);
+  factory AuthResult.error(String error) => AuthResult._(success: false, error: error);
+
+  bool get isSuccess => success;
+  bool get isError => !success;
+}
+
+// Auth response data models to match backend DTOs
+class AuthResponseData {
+  final String accessToken;
+  final String tokenType;
+  final int expiresIn;
+  final UserInfoData user;
+
+  AuthResponseData({
+    required this.accessToken,
+    required this.tokenType,
+    required this.expiresIn,
+    required this.user,
+  });
+
+  factory AuthResponseData.fromJson(Map<String, dynamic> json) {
+    return AuthResponseData(
+      accessToken: json['accessToken'] ?? '',
+      tokenType: json['tokenType'] ?? 'Bearer',
+      expiresIn: json['expiresIn'] ?? 86400000,
+      user: UserInfoData.fromJson(json['user']),
+    );
+  }
+}
+
+class UserInfoData {
+  final String id;
+  final String email;
+  final String name;
+  final bool isProfileComplete;
+  final bool isActive;
+
+  UserInfoData({
+    required this.id,
+    required this.email,
+    required this.name,
+    required this.isProfileComplete,
+    required this.isActive,
+  });
+
+  factory UserInfoData.fromJson(Map<String, dynamic> json) {
+    return UserInfoData(
+      id: json['id'] ?? '',
+      email: json['email'] ?? '',
+      name: json['name'] ?? '',
+      isProfileComplete: json['isProfileComplete'] ?? false,
+      isActive: json['isActive'] ?? true,
+    );
+  }
 }

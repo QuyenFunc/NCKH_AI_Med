@@ -82,17 +82,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           .toList();
 
       final updatedProfile = (currentProfile ?? UserProfile(userId: user.id)).copyWith(
-        chronicDiseases: chronicDiseases,
-        allergies: allergies,
-        currentMedications: medications,
-        smokingStatus: _smokingStatus,
-        drinkingFrequency: _drinkingFrequency,
+        medicalHistory: chronicDiseases.join(', '),
+        allergies: allergies.join(', '),
+        currentMedications: medications.join(', '),
+        smokingStatus: _smokingStatus?.name,
+        drinkingStatus: _drinkingFrequency?.name,
         updatedAt: DateTime.now(),
       );
 
-      final success = await AuthService.instance.saveProfile(updatedProfile);
+      final result = await AuthService.instance.saveProfile(updatedProfile);
 
-      if (success && mounted) {
+      if (result.isSuccess && mounted) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -267,7 +267,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 label: 'Hút thuốc lá',
                 value: _smokingStatus,
                 items: SmokingStatus.values,
-                itemLabels: const {
+                itemLabels: {
                   SmokingStatus.never: 'Không bao giờ',
                   SmokingStatus.former: 'Đã từng hút',
                   SmokingStatus.current: 'Đang hút thuốc',
@@ -287,10 +287,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 label: 'Uống rượu bia',
                 value: _drinkingFrequency,
                 items: DrinkingFrequency.values,
-                itemLabels: const {
+                itemLabels: {
                   DrinkingFrequency.never: 'Không bao giờ',
-                  DrinkingFrequency.occasionally: 'Thỉnh thoảng',
-                  DrinkingFrequency.regularly: 'Thường xuyên',
+                  DrinkingFrequency.rarely: 'Hiếm khi',
+                  DrinkingFrequency.weekly: 'Hàng tuần',
+                  DrinkingFrequency.daily: 'Hàng ngày',
                 },
                 onChanged: (value) {
                   setState(() {

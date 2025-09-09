@@ -14,7 +14,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final List<Message> _messages = [];
-  final ChatService _chatService = ChatService();
+  final ChatService _chatService = ChatService.instance;
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
 
@@ -69,21 +69,49 @@ Hãy mô tả triệu chứng hoặc vấn đề sức khỏe bạn đang gặp 
     _scrollToBottom();
 
     try {
-      // Call chat service
-      final response = await _chatService.sendMessage(content);
-      
-      // Remove thinking message and add bot response
+      // Send user message to backend
+      final userResult = await _chatService.sendUserMessage(content);
+      if (userResult.isError) {
+        throw Exception(userResult.error);
+      }
+
+      // Remove thinking message
       setState(() {
-        _messages.removeAt(0); // Remove thinking message
-        _messages.insert(0, Message.bot(response));
+        _messages.removeAt(0);
+      });
+
+      // Stream AI response from chatbot
+      String fullResponse = '';
+      await for (final chunk in _chatService.streamChatResponse(content)) {
+        fullResponse += chunk;
+        
+        setState(() {
+          if (_messages.isEmpty || !_messages[0].isBot) {
+            _messages.insert(0, Message.bot(fullResponse));
+          } else {
+            _messages[0] = Message.bot(fullResponse);
+          }
+        });
+        
+        _scrollToBottom();
+      }
+
+      // Save AI response to backend
+      if (fullResponse.isNotEmpty) {
+        await _chatService.saveAiResponse(fullResponse);
+      }
+
+      setState(() {
         _isLoading = false;
       });
     } catch (e) {
       // Handle error
       setState(() {
-        _messages.removeAt(0); // Remove thinking message
+        if (_messages.isNotEmpty && _messages[0].text.contains('🤔')) {
+          _messages.removeAt(0); // Remove thinking message
+        }
         _messages.insert(0, Message.bot(
-          'Xin lỗi, đã có lỗi xảy ra khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.'
+          'Xin lỗi, đã có lỗi xảy ra khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.\n\nChi tiết lỗi: ${e.toString()}'
         ));
         _isLoading = false;
       });

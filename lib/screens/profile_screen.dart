@@ -3,6 +3,7 @@ import '../services/auth_service.dart';
 import '../models/user.dart';
 import '../models/user_profile.dart';
 import 'login_screen.dart';
+import 'profile_detail_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -128,10 +129,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 16.0),
                   
-                  // Edit Profile Button
+                  // View Detail Button
                   ElevatedButton(
                     onPressed: () {
-                      // TODO: Navigate to edit profile
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const ProfileDetailScreen(),
+                        ),
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).primaryColor,
@@ -142,7 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     child: const Text(
-                      'Chỉnh sửa hồ sơ',
+                      'Xem chi tiết hồ sơ',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),

@@ -3,6 +3,10 @@ enum MessageSender { user, bot }
 class Message {
   final String id;
   final String content;
+  
+  // Getter for backward compatibility
+  String get text => content;
+  bool get isBot => sender == MessageSender.bot;
   final MessageSender sender;
   final DateTime timestamp;
   final bool isThinking;

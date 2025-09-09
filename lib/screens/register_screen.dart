@@ -30,22 +30,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Gender? _selectedGender;
   String? _selectedProvince;
 
-  // Vietnamese provinces
-  final List<String> _provinces = [
-    'An Giang', 'Bà Rịa - Vũng Tàu', 'Bạc Liêu', 'Bắc Giang', 'Bắc Kạn',
-    'Bắc Ninh', 'Bến Tre', 'Bình Dương', 'Bình Định', 'Bình Phước',
-    'Bình Thuận', 'Cà Mau', 'Cao Bằng', 'Cần Thơ', 'Đà Nẵng',
-    'Đắk Lắk', 'Đắk Nông', 'Điện Biên', 'Đồng Nai', 'Đồng Tháp',
-    'Gia Lai', 'Hà Giang', 'Hà Nam', 'Hà Nội', 'Hà Tĩnh',
-    'Hải Dương', 'Hải Phòng', 'Hậu Giang', 'Hòa Bình', 'Hồ Chí Minh',
-    'Hưng Yên', 'Khánh Hòa', 'Kiên Giang', 'Kon Tum', 'Lai Châu',
-    'Lạng Sơn', 'Lào Cai', 'Lâm Đồng', 'Long An', 'Nam Định',
-    'Nghệ An', 'Ninh Bình', 'Ninh Thuận', 'Phú Thọ', 'Phú Yên',
-    'Quảng Bình', 'Quảng Nam', 'Quảng Ngãi', 'Quảng Ninh', 'Quảng Trị',
-    'Sóc Trăng', 'Sơn La', 'Tây Ninh', 'Thái Bình', 'Thái Nguyên',
-    'Thanh Hóa', 'Thừa Thiên Huế', 'Tiền Giang', 'Trà Vinh', 'Tuyên Quang',
-    'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái'
-  ];
+  // Vietnamese provinces with IDs
+  final Map<String, int> _provinces = {
+    'An Giang': 1, 'Bà Rịa - Vũng Tàu': 2, 'Bạc Liêu': 3, 'Bắc Giang': 4, 'Bắc Kạn': 5,
+    'Bắc Ninh': 6, 'Bến Tre': 7, 'Bình Dương': 8, 'Bình Định': 9, 'Bình Phước': 10,
+    'Bình Thuận': 11, 'Cà Mau': 12, 'Cao Bằng': 13, 'Cần Thơ': 14, 'Đà Nẵng': 15,
+    'Đắk Lắk': 16, 'Đắk Nông': 17, 'Điện Biên': 18, 'Đồng Nai': 19, 'Đồng Tháp': 20,
+    'Gia Lai': 21, 'Hà Giang': 22, 'Hà Nam': 23, 'Hà Nội': 24, 'Hà Tĩnh': 25,
+    'Hải Dương': 26, 'Hải Phòng': 27, 'Hậu Giang': 28, 'Hòa Bình': 29, 'Hồ Chí Minh': 30,
+    'Hưng Yên': 31, 'Khánh Hòa': 32, 'Kiên Giang': 33, 'Kon Tum': 34, 'Lai Châu': 35,
+    'Lạng Sơn': 36, 'Lào Cai': 37, 'Lâm Đồng': 38, 'Long An': 39, 'Nam Định': 40,
+    'Nghệ An': 41, 'Ninh Bình': 42, 'Ninh Thuận': 43, 'Phú Thọ': 44, 'Phú Yên': 45,
+    'Quảng Bình': 46, 'Quảng Nam': 47, 'Quảng Ngãi': 48, 'Quảng Ninh': 49, 'Quảng Trị': 50,
+    'Sóc Trăng': 51, 'Sơn La': 52, 'Tây Ninh': 53, 'Thái Bình': 54, 'Thái Nguyên': 55,
+    'Thanh Hóa': 56, 'Thừa Thiên Huế': 57, 'Tiền Giang': 58, 'Trà Vinh': 59, 'Tuyên Quang': 60,
+    'Vĩnh Long': 61, 'Vĩnh Phúc': 62, 'Yên Bái': 63
+  };
 
   @override
   void dispose() {
@@ -94,32 +94,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       // Register user account
-      final success = await AuthService.instance.register(
+      final result = await AuthService.instance.register(
         _emailController.text.trim(),
         _passwordController.text,
+        _confirmPasswordController.text,
         _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
       );
 
-      if (success && mounted) {
+      if (result.isSuccess && mounted) {
         // Save basic profile information
         final user = AuthService.instance.currentUser!;
         final profile = UserProfile(
           userId: user.id,
+          name: user.name, // Include name to help with profile completion
           birthYear: _birthYear,
           gender: _selectedGender,
-          province: _selectedProvince,
+          provinceId: _selectedProvince != null ? _provinces[_selectedProvince] : null,
         );
 
-        await AuthService.instance.saveProfile(profile);
-
-        // Navigate to profile setup for medical information
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
-        );
+        final profileResult = await AuthService.instance.saveProfile(profile);
+        
+        if (profileResult.isSuccess) {
+          // Navigate to profile setup for medical information
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi lưu profile: ${profileResult.error}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đăng ký thất bại. Vui lòng thử lại.'),
+          SnackBar(
+            content: Text(result.error ?? 'Đăng ký thất bại. Vui lòng thử lại.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -525,7 +536,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   borderRadius: BorderRadius.circular(12.0),
                 ),
               ),
-              items: _provinces.map((province) {
+              items: _provinces.keys.map((province) {
                 return DropdownMenuItem(
                   value: province,
                   child: Text(province),
