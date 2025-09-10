@@ -117,3 +117,8 @@ coverage/
 **/test_images/
 *.dcm
 *.dicom
+
+# Chatbox data and model files
+web/chatbox/data/
+*.pkl
+*.index
