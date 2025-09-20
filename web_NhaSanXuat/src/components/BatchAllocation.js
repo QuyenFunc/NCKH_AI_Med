@@ -40,77 +40,62 @@ const BatchAllocation = () => {
 
   const fetchProducts = async () => {
     try {
-      // Mock data for active products
-      const mockProducts = [
-        {
-          id: 'PROD001',
-          name: 'Paracetamol 500mg',
-          category: 'Giảm đau hạ sốt',
-          activeIngredient: 'Paracetamol',
-          dosage: '500mg',
-          unit: 'viên',
-          shelfLife: '36 tháng',
-          storageConditions: 'Nơi khô ráo, tránh ánh sáng'
-        },
-        {
-          id: 'PROD002',
-          name: 'Amoxicillin 250mg',
-          category: 'Kháng sinh',
-          activeIngredient: 'Amoxicillin',
-          dosage: '250mg',
-          unit: 'viên',
-          shelfLife: '24 tháng',
-          storageConditions: 'Nhiệt độ phòng, tránh ẩm'
-        },
-        {
-          id: 'PROD003',
-          name: 'Vitamin C 1000mg',
-          category: 'Vitamin & Khoáng chất',
-          activeIngredient: 'Ascorbic Acid',
-          dosage: '1000mg',
-          unit: 'viên',
-          shelfLife: '24 tháng',
-          storageConditions: 'Nơi khô ráo, nhiệt độ dưới 30°C'
-        }
-      ];
-      setProducts(mockProducts.filter(p => p.status !== 'inactive'));
+      console.log('Fetching products from API...');
+      const response = await manufacturerService.getProducts();
+      console.log('Products response:', response);
+      
+      if (response.success && response.data) {
+        setProducts(response.data.filter(p => p.status === 'active'));
+        console.log('Loaded products:', response.data.length);
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (err) {
+      console.error('Error fetching products:', err);
       setError('Không thể tải danh sách sản phẩm: ' + err.message);
+      // Set empty array as fallback
+      setProducts([]);
     }
   };
 
   const fetchRecentBatches = async () => {
     try {
-      // Mock recent batches
-      const mockBatches = [
-        {
-          id: 'BT2024001',
-          productId: 'PROD001',
-          productName: 'Paracetamol 500mg',
-          quantity: 10000,
-          manufactureDate: '2024-09-15',
-          expiryDate: '2027-09-15',
-          qrCode: 'QR_BT2024001',
-          status: 'completed',
-          blockchainTx: '0x1234567890abcdef...',
-          createdAt: '2024-09-15T08:30:00Z'
-        },
-        {
-          id: 'BT2024002',
-          productId: 'PROD002',
-          productName: 'Amoxicillin 250mg',
-          quantity: 5000,
-          manufactureDate: '2024-09-16',
-          expiryDate: '2026-09-16',
-          qrCode: 'QR_BT2024002',
-          status: 'completed',
-          blockchainTx: '0xabcdef1234567890...',
-          createdAt: '2024-09-16T10:15:00Z'
-        }
-      ];
-      setBatches(mockBatches);
+      console.log('Fetching recent batches from API...');
+      const response = await manufacturerService.getBatches();
+      console.log('Batches response:', response);
+      
+      if (response.success && response.data) {
+        // Transform API data to expected format
+        const transformedBatches = response.data.map(batch => {
+          // Safe string processing with null checks
+          const safeString = (str) => str ? String(str) : '';
+          const safeSplit = (str, separator, index = 0) => {
+            if (!str) return '';
+            const parts = String(str).split(separator);
+            return parts[index] || '';
+          };
+
+          return {
+            id: safeString(batch.batchNumber || batch.id),
+            productId: batch.id || 0,
+            productName: safeString(batch.drugName),
+            quantity: batch.quantity || 0,
+            manufactureDate: safeSplit(batch.manufactureTimestamp, ' ', 0),
+            expiryDate: safeSplit(batch.expiryDate, ' ', 0),
+            qrCode: safeString(batch.qrCode),
+            status: 'completed',
+            blockchainTx: safeString(batch.transactionHash),
+            createdAt: safeString(batch.createdAt)
+          };
+        });
+        setBatches(transformedBatches);
+        console.log('Loaded batches:', transformedBatches.length);
+      } else {
+        setBatches([]);
+      }
     } catch (err) {
       console.error('Error fetching recent batches:', err);
+      setBatches([]);
     }
   };
 
@@ -173,9 +158,28 @@ const BatchAllocation = () => {
       setLoading(true);
       setError(null);
 
+      // Validate form first
+      if (!batchForm.productId || batchForm.productId === '') {
+        throw new Error('Vui lòng chọn sản phẩm');
+      }
+
+      if (!batchForm.quantity || parseInt(batchForm.quantity) <= 0) {
+        throw new Error('Vui lòng nhập số lượng hợp lệ');
+      }
+
       const batchId = generateBatchId();
       const qrCode = generateQRCode(batchId);
-      const product = products.find(p => p.id === batchForm.productId);
+      console.log('Available products:', products);
+      console.log('Looking for product ID:', batchForm.productId, 'Type:', typeof batchForm.productId);
+      
+      const product = products.find(p => {
+        console.log('Comparing:', p.id, 'vs', batchForm.productId, 'Types:', typeof p.id, typeof batchForm.productId);
+        return Number(p.id) === Number(batchForm.productId); // Convert both to numbers
+      });
+
+      if (!product) {
+        throw new Error(`Không tìm thấy sản phẩm với ID: ${batchForm.productId}. Available products: ${products.map(p => p.id).join(', ')}`);
+      }
 
       const batchData = {
         id: batchId,
@@ -523,11 +527,11 @@ const BatchAllocation = () => {
                         </span>
                       </td>
                       <td className="blockchain-tx">
-                        <span title={batch.blockchainTx}>
-                          {batch.blockchainTx.substring(0, 10)}...
+                        <span title={batch.blockchainTx || 'N/A'}>
+                          {batch.blockchainTx ? batch.blockchainTx.substring(0, 10) + '...' : 'N/A'}
                         </span>
                         <button 
-                          onClick={() => copyToClipboard(batch.blockchainTx)}
+                          onClick={() => copyToClipboard(batch.blockchainTx || '')}
                           className="copy-btn"
                         >
                           <Clipboard size={12} />

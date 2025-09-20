@@ -55,7 +55,7 @@ const blockchainAPI = {
       manufacturer: batchData.manufacturer,
       batchNumber: batchData.id,
       quantity: Number(batchData.quantity),
-      expiryDate: toDateTimeString(batchData.expiryDate),
+      expiryDate: batchData.expiryDate + 'T00:00:00',  // LocalDateTime format
       storageConditions: batchData.storageConditions || ''
     });
   },
@@ -121,29 +121,37 @@ const manufacturerService = {
   // Product Management
   getProducts: async () => {
     try {
-      return await apiClient.get('/products');
+      const response = await apiClient.get('/medications');
+      // Transform medication data to product format expected by frontend
+      if (response.success && response.data) {
+        const products = response.data.map(med => ({
+          id: med.id,
+          name: med.name,
+          category: med.drugClass || 'Khác',
+          dosage: med.commonDosages ? JSON.parse(med.commonDosages)[0] : 'N/A',
+          unit: 'viên', // Default unit
+          activeIngredient: med.genericName || med.name,
+          description: `Thuốc ${med.drugClass || 'điều trị'}`,
+          storageConditions: 'Nơi khô ráo, tránh ánh sáng',
+          shelfLife: '36 tháng', // Default shelf life
+          status: 'active',
+          createdDate: med.createdAt || new Date().toISOString(),
+          totalBatches: 0,
+          totalProduced: 0
+        }));
+        
+        return {
+          success: true,
+          data: products
+        };
+      }
+      throw new Error('Invalid response format');
     } catch (error) {
-      console.warn('Failed to get products:', error.message);
-      // Mock response with sample products
+      console.warn('Failed to get products from API:', error.message);
+      // Fallback to empty array
       return {
         success: true,
-        data: [
-          {
-            id: 'PROD001',
-            name: 'Paracetamol 500mg',
-            category: 'Giảm đau hạ sốt',
-            dosage: '500mg',
-            unit: 'viên',
-            activeIngredient: 'Paracetamol',
-            description: 'Thuốc giảm đau, hạ sốt hiệu quả',
-            storageConditions: 'Nơi khô ráo, tránh ánh sáng',
-            shelfLife: '36 tháng',
-            status: 'active',
-            createdDate: '2024-01-15',
-            totalBatches: 25,
-            totalProduced: 125000
-          }
-        ]
+        data: []
       };
     }
   },
@@ -199,7 +207,7 @@ const manufacturerService = {
 
   getBatches: async () => {
     try {
-      return await apiClient.get('/batches');
+      return await apiClient.get('/blockchain/drugs/batches');
     } catch (error) {
       console.warn('Failed to get batches:', error.message);
       return {
