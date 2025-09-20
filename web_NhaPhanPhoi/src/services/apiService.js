@@ -43,32 +43,53 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Blockchain API endpoints
+// Helpers
+const toDateTimeString = (input) => {
+  const d = new Date(input);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
+// Blockchain API endpoints (aligned with backend controllers)
 export const blockchainAPI = {
-  // Health check
-  healthCheck: () => apiClient.get('/blockchain/health'),
+  // Health check -> GET /api/blockchain/status
+  healthCheck: () => apiClient.get('/blockchain/status'),
   
-  // Manufacturer endpoints
-  createBatch: (batchData) => apiClient.post('/blockchain/manufacturer/batch', batchData),
+  // Manufacturer: create batch -> POST /api/blockchain/drugs/batches
+  createBatch: (batchData) => apiClient.post('/blockchain/drugs/batches', {
+    drugName: batchData.drugName,
+    manufacturer: batchData.manufacturer,
+    batchNumber: batchData.batchNumber,
+    quantity: Number(batchData.quantity),
+    expiryDate: toDateTimeString(batchData.expiryDate),
+    storageConditions: batchData.storageConditions || ''
+  }),
   
-  // Distributor endpoints
-  createShipment: (shipmentData) => apiClient.post('/blockchain/distributor/shipment', shipmentData),
+  // Distributor: create shipment -> POST /api/blockchain/drugs/shipments
+  createShipment: (shipmentData) => apiClient.post('/blockchain/drugs/shipments', {
+    batchId: shipmentData.batchId,
+    toAddress: shipmentData.pharmacyAddress,
+    quantity: Number(shipmentData.quantity),
+    trackingInfo: shipmentData.trackingNumber
+  }),
   
-  // Pharmacy endpoints
-  receiveShipment: (shipmentId) => apiClient.post(`/blockchain/pharmacy/receive/${shipmentId}`),
+  // Pharmacy: receive shipment -> POST /api/blockchain/drugs/shipments/{id}/receive
+  receiveShipment: (shipmentId) => apiClient.post(`/blockchain/drugs/shipments/${shipmentId}/receive`),
   
-  // Public endpoints
-  verifyDrug: (qrCode) => apiClient.get(`/blockchain/public/verify/${qrCode}`),
-  getBatchDetails: (batchId) => apiClient.get(`/blockchain/batch/${batchId}`),
+  // Public: verify drug by QR -> POST /api/blockchain/drugs/verify
+  verifyDrug: (qrCode) => apiClient.post('/blockchain/drugs/verify', { qrCode }),
   
-  // Get all batches (mock endpoint - implement in backend)
-  getAllBatches: () => apiClient.get('/blockchain/batches'),
+  // Batch details -> GET /api/blockchain/drugs/batches/{batchId}
+  getBatchDetails: (batchId) => apiClient.get(`/blockchain/drugs/batches/${batchId}`),
   
-  // Get shipments (mock endpoint - implement in backend)
-  getShipments: (params = {}) => apiClient.get('/blockchain/shipments', { params }),
+  // All batches (if implemented later)
+  getAllBatches: () => apiClient.get('/blockchain/drugs/batches'),
   
-  // Get shipment by ID
-  getShipmentById: (shipmentId) => apiClient.get(`/blockchain/shipments/${shipmentId}`)
+  // Shipments list (if implemented later)
+  getShipments: (params = {}) => apiClient.get('/blockchain/drugs/shipments', { params }),
+  
+  // Shipment by ID (if implemented later)
+  getShipmentById: (shipmentId) => apiClient.get(`/blockchain/drugs/shipments/${shipmentId}`)
 };
 
 // Mock data service (for development)

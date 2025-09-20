@@ -39,81 +39,40 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Helpers
+const toDateTimeString = (input) => {
+  const d = new Date(input);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
 // Blockchain API calls
 const blockchainAPI = {
-  // Create new batch (core function)
+  // Create new batch (core function) -> POST /api/blockchain/drugs/batches
   createBatch: async (batchData) => {
-    try {
-      return await apiClient.post('/blockchain/batches', {
-        drugInfo: {
-          name: batchData.productName,
-          manufacturer: batchData.manufacturer,
-          batchNumber: batchData.id,
-          expiryDate: batchData.expiryDate,
-          manufactureDate: batchData.manufactureDate,
-          storageConditions: batchData.storageConditions
-        },
-        quantity: batchData.quantity,
-        manufactureDate: Math.floor(new Date(batchData.manufactureDate).getTime() / 1000),
-        expiryDate: Math.floor(new Date(batchData.expiryDate).getTime() / 1000),
-        qrCode: batchData.qrCode
-      });
-    } catch (error) {
-      console.warn('Blockchain API not available, using mock response');
-      // Mock response for testing
-      return {
-        success: true,
-        data: {
-          batchId: batchData.id,
-          transactionHash: '0x' + Math.random().toString(16).substr(2, 64),
-          blockNumber: Math.floor(Math.random() * 1000000),
-          gasUsed: '150000'
-        },
-        message: 'Batch created successfully on blockchain'
-      };
-    }
+    return await apiClient.post('/blockchain/drugs/batches', {
+      drugName: batchData.productName,
+      manufacturer: batchData.manufacturer,
+      batchNumber: batchData.id,
+      quantity: Number(batchData.quantity),
+      expiryDate: toDateTimeString(batchData.expiryDate),
+      storageConditions: batchData.storageConditions || ''
+    });
   },
 
-  // Create shipment to distributor/pharmacy
+  // Create shipment -> POST /api/blockchain/drugs/shipments
   createShipment: async (shipmentData) => {
-    try {
-      return await apiClient.post('/blockchain/shipments', {
-        batchId: shipmentData.batchId,
-        to: shipmentData.recipientAddress,
-        quantity: shipmentData.quantity
-      });
-    } catch (error) {
-      console.warn('Blockchain API not available, using mock response');
-      return {
-        success: true,
-        data: {
-          shipmentId: shipmentData.id,
-          transactionHash: '0x' + Math.random().toString(16).substr(2, 64),
-          blockNumber: Math.floor(Math.random() * 1000000)
-        },
-        message: 'Shipment created successfully'
-      };
-    }
+    return await apiClient.post('/blockchain/drugs/shipments', {
+      batchId: shipmentData.batchId,
+      toAddress: shipmentData.recipientAddress,
+      quantity: Number(shipmentData.quantity),
+      trackingInfo: shipmentData.trackingInfo || undefined
+    });
   },
 
-  // Get batch details
+  // Get batch details -> GET /api/blockchain/drugs/batches/{batchId}
   getBatchById: async (batchId) => {
-    try {
-      return await apiClient.get(`/blockchain/batches/${batchId}`);
-    } catch (error) {
-      console.warn('Failed to get batch details:', error.message);
-      throw error;
-    }
-  },
-
-  // Get shipment details
-  getShipmentById: async (shipmentId) => {
-    try {
-      return await apiClient.get(`/blockchain/shipments/${shipmentId}`);
-    } catch (error) {
-      console.warn('Failed to get shipment details:', error.message);
-      throw error;
-    }
+    return await apiClient.get(`/blockchain/drugs/batches/${batchId}`);
   },
 
   // Get manufacturer statistics

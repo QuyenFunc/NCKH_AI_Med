@@ -131,10 +131,10 @@ public class BlockchainIndexerService {
             log.info("📦 Found {} BatchIssued events", logs.size());
 
             for (EthLog.LogResult logResult : logs) {
-                Log log = (Log) logResult.get();
+                Log eventLog = (Log) logResult.get();
                 
                 if (!eventRepository.existsByTransactionHashAndLogIndex(
-                    log.getTransactionHash(), log.getLogIndex())) {
+                    eventLog.getTransactionHash(), eventLog.getLogIndex())) {
                     
                     Map<String, Object> eventData = new HashMap<>();
                     eventData.put("drugName", ""); // Parse từ log data
@@ -144,17 +144,17 @@ public class BlockchainIndexerService {
                     BlockchainEvent event = BlockchainEvent.builder()
                         .eventType("BatchIssued")
                         .contractAddress(contractAddress)
-                        .transactionHash(log.getTransactionHash())
-                        .blockNumber(log.getBlockNumber())
-                        .logIndex(log.getLogIndex())
+                        .transactionHash(eventLog.getTransactionHash())
+                        .blockNumber(eventLog.getBlockNumber())
+                        .logIndex(eventLog.getLogIndex())
                         .eventData(objectMapper.writeValueAsString(eventData))
-                        .batchId(extractBatchIdFromLog(log))
-                        .fromAddress(extractManufacturerFromLog(log))
+                        .batchId(extractBatchIdFromLog(eventLog))
+                        .fromAddress(extractManufacturerFromLog(eventLog))
                         .processed(false)
                         .build();
                     
                     eventRepository.save(event);
-                    log.info("💾 Saved BatchIssued event: TX {}", log.getTransactionHash());
+                    log.info("💾 Saved BatchIssued event: TX {}", eventLog.getTransactionHash());
                 }
             }
         } catch (Exception e) {
@@ -181,10 +181,10 @@ public class BlockchainIndexerService {
             log.info("🚚 Found {} ShipmentCreated events", logs.size());
 
             for (EthLog.LogResult logResult : logs) {
-                Log log = (Log) logResult.get();
+                Log eventLog = (Log) logResult.get();
                 
                 if (!eventRepository.existsByTransactionHashAndLogIndex(
-                    log.getTransactionHash(), log.getLogIndex())) {
+                    eventLog.getTransactionHash(), eventLog.getLogIndex())) {
                     
                     Map<String, Object> eventData = new HashMap<>();
                     eventData.put("quantity", "");
@@ -192,19 +192,19 @@ public class BlockchainIndexerService {
                     BlockchainEvent event = BlockchainEvent.builder()
                         .eventType("ShipmentCreated")
                         .contractAddress(contractAddress)
-                        .transactionHash(log.getTransactionHash())
-                        .blockNumber(log.getBlockNumber())
-                        .logIndex(log.getLogIndex())
+                        .transactionHash(eventLog.getTransactionHash())
+                        .blockNumber(eventLog.getBlockNumber())
+                        .logIndex(eventLog.getLogIndex())
                         .eventData(objectMapper.writeValueAsString(eventData))
-                        .batchId(extractBatchIdFromLog(log))
-                        .shipmentId(extractShipmentIdFromLog(log))
-                        .fromAddress(extractFromAddressFromLog(log))
-                        .toAddress(extractToAddressFromLog(log))
+                        .batchId(extractBatchIdFromLog(eventLog))
+                        .shipmentId(extractShipmentIdFromLog(eventLog))
+                        .fromAddress(extractFromAddressFromLog(eventLog))
+                        .toAddress(extractToAddressFromLog(eventLog))
                         .processed(false)
                         .build();
                     
                     eventRepository.save(event);
-                    log.info("💾 Saved ShipmentCreated event: TX {}", log.getTransactionHash());
+                    log.info("💾 Saved ShipmentCreated event: TX {}", eventLog.getTransactionHash());
                 }
             }
         } catch (Exception e) {
@@ -231,26 +231,26 @@ public class BlockchainIndexerService {
             log.info("📦 Found {} ShipmentReceived events", logs.size());
 
             for (EthLog.LogResult logResult : logs) {
-                Log log = (Log) logResult.get();
+                Log eventLog = (Log) logResult.get();
                 
                 if (!eventRepository.existsByTransactionHashAndLogIndex(
-                    log.getTransactionHash(), log.getLogIndex())) {
+                    eventLog.getTransactionHash(), eventLog.getLogIndex())) {
                     
                     BlockchainEvent event = BlockchainEvent.builder()
                         .eventType("ShipmentReceived")
                         .contractAddress(contractAddress)
-                        .transactionHash(log.getTransactionHash())
-                        .blockNumber(log.getBlockNumber())
-                        .logIndex(log.getLogIndex())
+                        .transactionHash(eventLog.getTransactionHash())
+                        .blockNumber(eventLog.getBlockNumber())
+                        .logIndex(eventLog.getLogIndex())
                         .eventData("{}")
-                        .batchId(extractBatchIdFromLog(log))
-                        .shipmentId(extractShipmentIdFromLog(log))
-                        .toAddress(extractReceiverFromLog(log))
+                        .batchId(extractBatchIdFromLog(eventLog))
+                        .shipmentId(extractShipmentIdFromLog(eventLog))
+                        .toAddress(extractReceiverFromLog(eventLog))
                         .processed(false)
                         .build();
                     
                     eventRepository.save(event);
-                    log.info("💾 Saved ShipmentReceived event: TX {}", log.getTransactionHash());
+                    log.info("💾 Saved ShipmentReceived event: TX {}", eventLog.getTransactionHash());
                 }
             }
         } catch (Exception e) {

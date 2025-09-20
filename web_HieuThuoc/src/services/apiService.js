@@ -76,62 +76,12 @@ const apiClient = {
 const blockchainAPI = {
   // Confirm receipt of goods (core function)
   confirmReceiveGoods: async (receiptData) => {
-    try {
-      return await apiClient.post('/blockchain/pharmacy/receive', {
-        shipmentId: receiptData.shipmentId,
-        trackingCode: receiptData.trackingCode,
-        products: receiptData.products,
-        confirmedBy: receiptData.confirmedBy,
-        confirmationDate: receiptData.confirmationDate,
-        pharmacyInfo: receiptData.pharmacyInfo
-      });
-    } catch (error) {
-      console.warn('Blockchain API not available, using mock response');
-      // Mock response for testing
-      return {
-        success: true,
-        data: {
-          transactionHash: '0x' + Math.random().toString(16).substr(2, 64),
-          blockNumber: Math.floor(Math.random() * 1000000),
-          gasUsed: '120000',
-          newOwner: receiptData.pharmacyInfo.name
-        },
-        message: 'Goods received successfully, ownership transferred on blockchain'
-      };
-    }
+    return await apiClient.post(`/blockchain/drugs/shipments/${receiptData.shipmentId}/receive`, {});
   },
 
-  // Verify drug authenticity and get blockchain history
+  // Verify drug authenticity and get blockchain history -> POST /api/blockchain/drugs/verify
   verifyDrug: async (qrCode) => {
-    try {
-      return await apiClient.post('/blockchain/verify', { qrCode });
-    } catch (error) {
-      console.warn('Blockchain API not available, using mock response');
-      // Mock comprehensive verification response
-      return {
-        success: true,
-        data: {
-          isAuthentic: true,
-          product: {
-            name: 'Paracetamol 500mg',
-            batchCode: qrCode.includes('BT') ? qrCode : 'BT2024001',
-            activeIngredient: 'Paracetamol',
-            dosage: '500mg',
-            manufacturer: 'Công ty Dược phẩm ABC',
-            manufactureDate: '2024-09-15',
-            expiryDate: '2027-09-15'
-          },
-          blockchainHistory: [
-            {
-              event: 'Manufactured',
-              actor: 'Công ty Dược phẩm ABC',
-              timestamp: '2024-09-15T08:30:00Z',
-              txHash: '0x1234567890abcdef...'
-            }
-          ]
-        }
-      };
-    }
+    return await apiClient.post('/blockchain/drugs/verify', { qrCode });
   },
 
   // Get pharmacy statistics
