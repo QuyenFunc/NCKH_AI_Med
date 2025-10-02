@@ -109,7 +109,17 @@ const BatchAllocation = () => {
   };
 
   const generateQRCode = (batchId) => {
+    // Generate unique QR code for each individual product in the batch
     return `QR_${batchId}_${Date.now()}`;
+  };
+
+  const generateIndividualQRCodes = (batchId, quantity) => {
+    // Generate array of unique QR codes for each product in the batch
+    const qrCodes = [];
+    for (let i = 1; i <= quantity; i++) {
+      qrCodes.push(`QR_${batchId}_${i.toString().padStart(6, '0')}`);
+    }
+    return qrCodes;
   };
 
   const calculateExpiryDate = (manufactureDate, shelfLifeMonths) => {
@@ -168,7 +178,8 @@ const BatchAllocation = () => {
       }
 
       const batchId = generateBatchId();
-      const qrCode = generateQRCode(batchId);
+      const quantity = parseInt(batchForm.quantity);
+      
       console.log('Available products:', products);
       console.log('Looking for product ID:', batchForm.productId, 'Type:', typeof batchForm.productId);
       
@@ -181,17 +192,20 @@ const BatchAllocation = () => {
         throw new Error(`Không tìm thấy sản phẩm với ID: ${batchForm.productId}. Available products: ${products.map(p => p.id).join(', ')}`);
       }
 
+      // Generate individual QR codes for each product in the batch
+      const individualQRCodes = generateIndividualQRCodes(batchId, quantity);
+      
       const batchData = {
         id: batchId,
         productId: batchForm.productId,
         productName: product.name,
-        quantity: parseInt(batchForm.quantity),
+        quantity: quantity,
         manufactureDate: batchForm.manufactureDate,
         expiryDate: batchForm.expiryDate,
         productionLine: batchForm.productionLine,
         qualityControlNotes: batchForm.qualityControlNotes,
         storageLocation: batchForm.storageLocation,
-        qrCode: qrCode,
+        qrCodes: individualQRCodes, // Array of QR codes for individual products
         manufacturer: 'Công ty Dược ABC',
         activeIngredient: product.activeIngredient,
         dosage: product.dosage,

@@ -13,6 +13,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import './BatchManagement.css';
+import distributorService from '../services/apiService';
 
 const BatchManagement = () => {
   const [batches, setBatches] = useState([]);
@@ -23,90 +24,68 @@ const BatchManagement = () => {
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Mock data - sẽ thay thế bằng API calls
+  // Load real data from backend
   useEffect(() => {
     const fetchBatches = async () => {
-      setLoading(true);
-      
-      // Simulate API call
-      setTimeout(() => {
-        const mockBatches = [
-          {
-            id: 'BT001234',
-            drugName: 'Paracetamol 500mg',
-            manufacturer: 'ABC Pharma Ltd',
-            quantity: 1000,
-            availableQuantity: 750,
-            manufactureDate: '2024-01-15',
-            expiryDate: '2026-01-15',
-            status: 'available',
-            qrCode: 'QR_BT001234',
-            location: 'Kho A - Kệ 1B',
-            registrationNumber: 'VD-123456-24',
-            activeIngredient: 'Acetaminophen'
-          },
-          {
-            id: 'BT001235',
-            drugName: 'Amoxicillin 250mg',
-            manufacturer: 'XYZ Healthcare',
-            quantity: 500,
-            availableQuantity: 0,
-            manufactureDate: '2024-02-01',
-            expiryDate: '2025-02-01',
-            status: 'out_of_stock',
-            qrCode: 'QR_BT001235',
-            location: 'Kho B - Kệ 2A',
-            registrationNumber: 'VD-789012-24',
-            activeIngredient: 'Amoxicillin trihydrate'
-          },
-          {
-            id: 'BT001236',
-            drugName: 'Vitamin C 1000mg',
-            manufacturer: 'Health Plus Co',
-            quantity: 2000,
-            availableQuantity: 1850,
-            manufactureDate: '2024-03-10',
-            expiryDate: '2025-09-10',
-            status: 'expiring_soon',
-            qrCode: 'QR_BT001236',
-            location: 'Kho A - Kệ 3C',
-            registrationNumber: 'VD-345678-24',
-            activeIngredient: 'Ascorbic acid'
-          },
-          {
-            id: 'BT001237',
-            drugName: 'Ibuprofen 400mg',
-            manufacturer: 'MediCare Inc',
-            quantity: 800,
-            availableQuantity: 650,
-            manufactureDate: '2024-01-20',
-            expiryDate: '2027-01-20',
-            status: 'available',
-            qrCode: 'QR_BT001237',
-            location: 'Kho B - Kệ 1A',
-            registrationNumber: 'VD-901234-24',
-            activeIngredient: 'Ibuprofen'
-          },
-          {
-            id: 'BT001238',
-            drugName: 'Cetirizine 10mg',
-            manufacturer: 'PharmaTech Ltd',
-            quantity: 1500,
-            availableQuantity: 1200,
-            manufactureDate: '2024-02-15',
-            expiryDate: '2026-08-15',
-            status: 'available',
-            qrCode: 'QR_BT001238',
-            location: 'Kho A - Kệ 2B',
-            registrationNumber: 'VD-567890-24',
-            activeIngredient: 'Cetirizine dihydrochloride'
-          }
-        ];
-        
-        setBatches(mockBatches);
-        setFilteredBatches(mockBatches);
+      try {
+        setLoading(true);
+        const ownerAddress = localStorage.getItem('walletAddress');
+        if (!ownerAddress) {
+          // Chưa cấu hình ví NPP -> không hiển thị lô nào
+          setBatches([]);
+          setFilteredBatches([]);
+          setLoading(false);
+          return;
+        }
+        const res = ownerAddress 
+          ? await distributorService.getBatchesByOwner(ownerAddress)
+          : await distributorService.getBatches();
+        if (res?.success && Array.isArray(res.data)) {
+          const mapped = res.data.map((item) => {
+            // Map backend status to frontend status
+            let frontendStatus = 'available';
+            const backendStatus = item.status?.toUpperCase?.();
+            
+            if (backendStatus === 'DELIVERED') {
+              // DELIVERED means it's in stock at distributor
+              frontendStatus = item.quantity > 0 ? 'available' : 'out_of_stock';
+            } else if (backendStatus === 'IN_TRANSIT') {
+              frontendStatus = 'in_transit';
+            } else if (backendStatus === 'SOLD') {
+              frontendStatus = 'out_of_stock';
+            } else if (backendStatus === 'MANUFACTURED') {
+              frontendStatus = 'available';
+            }
+
+            return {
+              id: (item.batchId?.toString?.() || item.batchNumber || item.id),
+              drugName: item.drugName,
+              manufacturer: item.manufacturer || item.manufacturerAddress || 'N/A',
+              quantity: item.quantity,
+              availableQuantity: item.availableQuantity ?? item.quantity,
+              manufactureDate: item.manufactureTimestamp?.split?.(' ')?.[0] || item.manufactureDate || '',
+              expiryDate: item.expiryDate?.split?.(' ')?.[0] || '',
+              status: frontendStatus,
+              backendStatus: item.status, // Keep original for debugging
+              qrCode: item.qrCode || '',
+              location: item.location || 'Kho chính',
+              registrationNumber: item.registrationNumber || '',
+              activeIngredient: item.activeIngredient || ''
+            };
+          });
+          setBatches(mapped);
+          setFilteredBatches(mapped);
+        } else {
+          setBatches([]);
+          setFilteredBatches([]);
+        }
+      } catch (e) {
+        console.error('Failed to fetch batches:', e);
+        setBatches([]);
+        setFilteredBatches([]);
+      } finally {
         setLoading(false);
-      }, 1000);
+      }
     };
 
     fetchBatches();
@@ -149,6 +128,11 @@ const BatchManagement = () => {
         label: 'Sắp hết hạn',
         className: 'status-expiring',
         icon: Clock
+      },
+      in_transit: {
+        label: 'Đang vận chuyển',
+        className: 'status-in-transit',
+        icon: Truck
       }
     };
 

@@ -11,6 +11,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import pharmacyService from '../services/apiService';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -31,66 +32,41 @@ const Dashboard = () => {
       try {
         setLoading(true);
         
-        // Mock data for pharmacy dashboard
-        setStats({
-          pendingReceive: 8,
-          totalInventory: 15750,
-          lowStockItems: 12,
-          expiringItems: 5
-        });
+        // Get real dashboard data from API
+        const dashboardResponse = await pharmacyService.getDashboardStats();
+        if (dashboardResponse.success) {
+          setStats(dashboardResponse.data);
+          
+          // Update inventory distribution based on real data
+          const inventory = dashboardResponse.data.inventory || [];
+          const categoryStats = {};
+          inventory.forEach(item => {
+            if (!categoryStats[item.category]) {
+              categoryStats[item.category] = 0;
+            }
+            categoryStats[item.category] += item.currentStock;
+          });
+          
+          const inventoryData = Object.entries(categoryStats).map(([category, quantity], index) => ({
+            category,
+            quantity,
+            color: ['#3498db', '#27ae60', '#f39c12', '#e74c3c', '#9b59b6', '#95a5a6'][index % 6]
+          }));
+          
+          setInventoryData(inventoryData);
+        } else {
+          setStats({
+            pendingReceive: 0,
+            totalInventory: 0,
+            lowStockItems: 0,
+            expiringItems: 0
+          });
+          setInventoryData([]);
+        }
 
-        // Mock recent activities
-        setRecentActivities([
-          {
-            id: 1,
-            type: 'receive_goods',
-            message: 'Nhận lô hàng SH001 từ Nhà phân phối ABC',
-            timestamp: new Date(Date.now() - 45 * 60 * 1000),
-            icon: ShoppingCart
-          },
-          {
-            id: 2,
-            type: 'sale',
-            message: 'Bán 50 viên Paracetamol 500mg cho khách hàng',
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-            icon: TrendingUp
-          },
-          {
-            id: 3,
-            type: 'verification',
-            message: 'Xác thực nguồn gốc Amoxicillin 250mg',
-            timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
-            icon: CheckCircle
-          },
-          {
-            id: 4,
-            type: 'low_stock',
-            message: 'Cảnh báo: Vitamin C 1000mg sắp hết hàng',
-            timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-            icon: AlertTriangle
-          }
-        ]);
-
-        // Mock inventory distribution data
-        setInventoryData([
-          { category: 'Giảm đau hạ sốt', quantity: 4500, color: '#3498db' },
-          { category: 'Kháng sinh', quantity: 3200, color: '#27ae60' },
-          { category: 'Vitamin & KCS', quantity: 2800, color: '#f39c12' },
-          { category: 'Thuốc tim mạch', quantity: 2100, color: '#e74c3c' },
-          { category: 'Thuốc tiêu hóa', quantity: 1850, color: '#9b59b6' },
-          { category: 'Khác', quantity: 1300, color: '#95a5a6' }
-        ]);
-
-        // Mock sales trend data
-        setSalesData([
-          { day: 'T2', sales: 85, revenue: 2850000 },
-          { day: 'T3', sales: 92, revenue: 3120000 },
-          { day: 'T4', sales: 78, revenue: 2680000 },
-          { day: 'T5', sales: 105, revenue: 3580000 },
-          { day: 'T6', sales: 118, revenue: 4020000 },
-          { day: 'T7', sales: 125, revenue: 4350000 },
-          { day: 'CN', sales: 95, revenue: 3250000 }
-        ]);
+        // Initialize empty activities and sales data
+        setRecentActivities([]);
+        setSalesData([]);
 
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -210,7 +186,7 @@ const Dashboard = () => {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={salesData}>
+              <BarChart data={salesData || []}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
@@ -235,16 +211,17 @@ const Dashboard = () => {
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={inventoryData}
+                  data={inventoryData || []}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={({ category, percent }) => category ? `${category}: ${(percent * 100).toFixed(0)}%` : ''}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="quantity"
+                  nameKey="category"
                 >
-                  {inventoryData.map((entry, index) => (
+                  {(inventoryData || []).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>

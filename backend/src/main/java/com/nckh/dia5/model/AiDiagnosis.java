@@ -1,5 +1,6 @@
 package com.nckh.dia5.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -16,6 +17,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class AiDiagnosis {
 
     @Id
@@ -24,6 +26,7 @@ public class AiDiagnosis {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User user;
 
     @Column(name = "session_id", nullable = false, length = 36)
@@ -32,6 +35,7 @@ public class AiDiagnosis {
     // Primary diagnosis
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "primary_diagnosis_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private DiseaseCategory primaryDiagnosis;
 
     @Column(name = "primary_confidence", precision = 5, scale = 2)
@@ -58,6 +62,7 @@ public class AiDiagnosis {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recommended_specialty_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private MedicalSpecialty recommendedSpecialty;
 
     // AI model information

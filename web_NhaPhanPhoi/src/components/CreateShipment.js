@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Loader
 } from 'lucide-react';
+import { distributorService } from '../services/apiService';
 import './CreateShipment.css';
 
 const CreateShipment = () => {
@@ -37,73 +38,58 @@ const CreateShipment = () => {
   const [selectedPharmacy, setSelectedPharmacy] = useState(null);
   const [errors, setErrors] = useState({});
 
-  // Mock data - thay thế bằng API calls
+  // Fetch real data from API
   useEffect(() => {
     const fetchData = async () => {
-      // Mock batches
-      const mockBatches = [
-        {
-          id: 'BT001234',
-          drugName: 'Paracetamol 500mg',
-          manufacturer: 'ABC Pharma Ltd',
-          availableQuantity: 750,
-          totalQuantity: 1000,
-          expiryDate: '2026-01-15',
-          location: 'Kho A - Kệ 1B'
-        },
-        {
-          id: 'BT001237',
-          drugName: 'Ibuprofen 400mg',
-          manufacturer: 'MediCare Inc',
-          availableQuantity: 650,
-          totalQuantity: 800,
-          expiryDate: '2027-01-20',
-          location: 'Kho B - Kệ 1A'
-        },
-        {
-          id: 'BT001238',
-          drugName: 'Cetirizine 10mg',
-          manufacturer: 'PharmaTech Ltd',
-          availableQuantity: 1200,
-          totalQuantity: 1500,
-          expiryDate: '2026-08-15',
-          location: 'Kho A - Kệ 2B'
+      try {
+        // Fetch distributor INVENTORY (not batches) to get real available quantities
+        const ownerAddress = localStorage.getItem('walletAddress');
+        if (!ownerAddress) {
+          setErrors({ general: 'Không tìm thấy địa chỉ ví nhà phân phối. Vui lòng đăng nhập.' });
+          return;
         }
-      ];
-
-      // Mock pharmacies
-      const mockPharmacies = [
-        {
-          id: 'PH001',
-          name: 'Hiệu thuốc Sài Gòn',
-          address: '123 Nguyễn Văn Cừ, Q1, TP.HCM',
-          contactPerson: 'Nguyễn Văn A',
-          phone: '0901234567',
-          email: 'contact@pharmasaigon.com',
-          walletAddress: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
-        },
-        {
-          id: 'PH002',
-          name: 'Hiệu thuốc Hà Nội',
-          address: '456 Phố Huế, Hai Bà Trưng, Hà Nội',
-          contactPerson: 'Trần Thị B',
-          phone: '0907654321',
-          email: 'info@pharmahanoi.com',
-          walletAddress: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
-        },
-        {
-          id: 'PH003',
-          name: 'Hiệu thuốc Miền Tây',
-          address: '789 Đường 30/4, Cần Thơ',
-          contactPerson: 'Lê Văn C',
-          phone: '0909876543',
-          email: 'support@pharmamientay.com',
-          walletAddress: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65'
+        
+        // Use inventory endpoint instead of batch endpoint
+        const inventoryResponse = await distributorService.getInventoryByWallet(ownerAddress);
+        console.log('Inventory response for CreateShipment:', inventoryResponse);
+        
+        if (inventoryResponse.success && inventoryResponse.data) {
+          console.log('All inventory from backend:', inventoryResponse.data);
+          console.log('Inventory quantities:', inventoryResponse.data.map(inv => ({ 
+            batchId: inv.blockchainBatchId, 
+            drugName: inv.drugName,
+            available: inv.availableQuantity,
+            total: inv.quantity 
+          })));
+          
+          // Filter for items with available quantity > 0
+          const availableBatches = inventoryResponse.data
+            .filter(inv => inv.availableQuantity > 0)
+            .map(inv => ({
+              id: inv.blockchainBatchId?.toString() || inv.id,
+              drugName: inv.drugName,
+              manufacturer: inv.manufacturer || 'N/A',
+              availableQuantity: inv.availableQuantity,  // REAL available quantity from inventory
+              totalQuantity: inv.quantity,
+              expiryDate: inv.expiryDate ? inv.expiryDate.split(' ')[0] : '',
+              location: inv.warehouseLocation || 'Kho chính',
+              batchNumber: inv.batchNumber
+            }));
+          
+          console.log('Filtered available inventory for shipment:', availableBatches);
+          setBatches(availableBatches);
         }
-      ];
 
-      setBatches(mockBatches.filter(b => b.availableQuantity > 0));
-      setPharmacies(mockPharmacies);
+        // Fetch real pharmacies
+        const pharmaciesResponse = await distributorService.getPharmacies();
+        if (pharmaciesResponse.success && pharmaciesResponse.data) {
+          setPharmacies(pharmaciesResponse.data);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setBatches([]);
+        setPharmacies([]);
+      }
     };
 
     fetchData();
@@ -195,36 +181,71 @@ const CreateShipment = () => {
     setLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Prepare shipment data for API
+      const shipmentData = {
+        batchId: formData.batchId,
+        pharmacyId: formData.pharmacyId,
+        quantity: formData.quantity,
+        trackingNumber: formData.trackingNumber,
+        notes: formData.notes,
+        transportMethod: 'Xe tải', // Can be made configurable later
+        driverName: '', // Can be added to form later
+        driverPhone: '' // Can be added to form later
+      };
       
-      // TODO: Call actual blockchain API
       console.log('Creating shipment:', {
         ...formData,
         selectedBatch,
         selectedPharmacy
       });
 
-      // Show success and redirect
-      alert('Shipment đã được tạo thành công!');
+      // Call actual API
+      const response = await distributorService.createShipment(shipmentData);
       
-      // Reset form
-      setFormData({
-        batchId: '',
-        pharmacyId: '',
-        quantity: '',
-        trackingNumber: '',
-        notes: '',
-        estimatedDelivery: '',
-        priority: 'normal'
-      });
-      setSelectedBatch(null);
-      setSelectedPharmacy(null);
-      setStep(1);
+      if (response.success) {
+        alert(`Shipment đã được tạo thành công! Mã shipment: ${response.data?.shipmentCode || 'N/A'}`);
+        
+        // Refresh inventory to show updated quantities
+        const ownerAddress = localStorage.getItem('walletAddress');
+        if (ownerAddress) {
+          const inventoryResponse = await distributorService.getInventoryByWallet(ownerAddress);
+          if (inventoryResponse.success && inventoryResponse.data) {
+            const availableBatches = inventoryResponse.data
+              .filter(inv => inv.availableQuantity > 0)
+              .map(inv => ({
+                id: inv.blockchainBatchId?.toString() || inv.id,
+                drugName: inv.drugName,
+                manufacturer: inv.manufacturer || 'N/A',
+                availableQuantity: inv.availableQuantity,
+                totalQuantity: inv.quantity,
+                expiryDate: inv.expiryDate ? inv.expiryDate.split(' ')[0] : '',
+                location: inv.warehouseLocation || 'Kho chính',
+                batchNumber: inv.batchNumber
+              }));
+            setBatches(availableBatches);
+          }
+        }
+        
+        // Reset form
+        setFormData({
+          batchId: '',
+          pharmacyId: '',
+          quantity: '',
+          trackingNumber: '',
+          notes: '',
+          estimatedDelivery: '',
+          priority: 'normal'
+        });
+        setSelectedBatch(null);
+        setSelectedPharmacy(null);
+        setStep(1);
+      } else {
+        throw new Error(response.message || 'Không thể tạo shipment');
+      }
       
     } catch (error) {
       console.error('Error creating shipment:', error);
-      alert('Có lỗi xảy ra khi tạo shipment. Vui lòng thử lại.');
+      alert('Có lỗi xảy ra khi tạo shipment: ' + (error.message || 'Vui lòng thử lại.'));
     } finally {
       setLoading(false);
     }

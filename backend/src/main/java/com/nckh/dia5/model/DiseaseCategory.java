@@ -1,5 +1,6 @@
 package com.nckh.dia5.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class DiseaseCategory {
 
     @Id
@@ -50,6 +52,7 @@ public class DiseaseCategory {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "specialty_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private MedicalSpecialty specialty;
 
     @CreatedDate

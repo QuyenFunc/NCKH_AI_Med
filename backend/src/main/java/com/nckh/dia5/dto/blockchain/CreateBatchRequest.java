@@ -3,7 +3,7 @@ package com.nckh.dia5.dto.blockchain;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.FutureOrPresent;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,7 +34,7 @@ public class CreateBatchRequest {
     private Long quantity;
 
     @NotNull(message = "Ngày hết hạn không được để trống")
-    @Future(message = "Ngày hết hạn phải là thời gian trong tương lai")
+    @FutureOrPresent(message = "Ngày hết hạn phải là thời gian hiện tại hoặc trong tương lai")
     private LocalDateTime expiryDate;
 
     @Size(max = 500, message = "Điều kiện bảo quản không được vượt quá 500 ký tự")

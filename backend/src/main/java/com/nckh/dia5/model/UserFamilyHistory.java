@@ -1,5 +1,6 @@
 package com.nckh.dia5.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class UserFamilyHistory {
 
     @Id
@@ -23,6 +25,7 @@ public class UserFamilyHistory {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User user;
 
     @Enumerated(EnumType.STRING)
@@ -31,6 +34,7 @@ public class UserFamilyHistory {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "disease_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private DiseaseCategory disease;
 
     @Column(name = "age_of_onset")
@@ -41,6 +45,7 @@ public class UserFamilyHistory {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cause_of_death")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private DiseaseCategory causeOfDeath;
 
     @Column(name = "notes", columnDefinition = "TEXT")

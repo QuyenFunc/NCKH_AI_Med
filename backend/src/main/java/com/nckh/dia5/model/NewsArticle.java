@@ -1,5 +1,6 @@
 package com.nckh.dia5.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -18,6 +19,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class NewsArticle {
 
     @Id
@@ -42,6 +44,7 @@ public class NewsArticle {
     // Categorization
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "primary_category_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private MedicalSpecialty primaryCategory;
 
     @Enumerated(EnumType.STRING)
@@ -97,6 +100,7 @@ public class NewsArticle {
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "article", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private List<UserNewsInteraction> userInteractions;
 
     public enum TargetAudience {

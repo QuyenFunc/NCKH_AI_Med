@@ -66,6 +66,6 @@ public interface BlockchainTransactionRepository extends JpaRepository<Blockchai
     @Query("SELECT bt FROM BlockchainTransaction bt WHERE bt.drugBatch.batchId = :batchId ORDER BY bt.timestamp ASC")
     List<BlockchainTransaction> findByBatchIdOrderByTimestamp(@Param("batchId") BigInteger batchId);
 
-    @Query("SELECT bt FROM BlockchainTransaction bt WHERE bt.shipment.shipmentId = :shipmentId ORDER BY bt.timestamp ASC")
+    @Query("SELECT bt FROM BlockchainTransaction bt WHERE bt.shipment.shipmentCode = CONCAT('SHIP-', :shipmentId) ORDER BY bt.timestamp ASC")
     List<BlockchainTransaction> findByShipmentIdOrderByTimestamp(@Param("shipmentId") BigInteger shipmentId);
 }

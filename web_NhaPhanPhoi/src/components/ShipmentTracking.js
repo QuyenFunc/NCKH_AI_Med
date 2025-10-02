@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Truck, MapPin, Clock, CheckCircle, AlertCircle, Search, Filter } from 'lucide-react';
+import distributorService from '../services/apiService';
 import './ShipmentTracking.css';
 
 const ShipmentTracking = () => {
@@ -17,61 +18,39 @@ const ShipmentTracking = () => {
     const fetchShipments = async () => {
         try {
             setLoading(true);
-            // Mock data - replace with actual API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            setError(null);
             
-            const mockShipments = [
-                {
-                    id: 'SH001',
-                    batchId: 'BT2024001',
-                    from: 'Nhà sản xuất ABC',
-                    to: 'Hiệu thuốc XYZ',
-                    status: 'in_transit',
-                    createdAt: '2024-09-18T10:00:00Z',
-                    estimatedDelivery: '2024-09-20T15:00:00Z',
-                    currentLocation: 'Kho trung chuyển Hà Nội',
-                    trackingNumber: 'TRK001234567',
-                    quantity: 100,
-                    drugName: 'Paracetamol 500mg'
-                },
-                {
-                    id: 'SH002',
-                    batchId: 'BT2024002',
-                    from: 'Nhà sản xuất DEF',
-                    to: 'Hiệu thuốc ABC',
-                    status: 'delivered',
-                    createdAt: '2024-09-17T09:30:00Z',
-                    deliveredAt: '2024-09-18T14:20:00Z',
-                    currentLocation: 'Đã giao hàng',
-                    trackingNumber: 'TRK001234568',
-                    quantity: 50,
-                    drugName: 'Amoxicillin 250mg'
-                },
-                {
-                    id: 'SH003',
-                    batchId: 'BT2024003',
-                    from: 'Nhà sản xuất GHI',
-                    to: 'Hiệu thuốc DEF',
-                    status: 'pending',
-                    createdAt: '2024-09-18T14:15:00Z',
-                    estimatedDelivery: '2024-09-21T10:00:00Z',
-                    currentLocation: 'Chờ xuất kho',
-                    trackingNumber: 'TRK001234569',
-                    quantity: 200,
-                    drugName: 'Vitamin C 1000mg'
-                }
-            ];
-            
-            setShipments(mockShipments);
+            // Get recipient's wallet address
+            const recipientAddress = localStorage.getItem('walletAddress');
+            if (!recipientAddress) {
+                setError('Không tìm thấy địa chỉ ví nhà phân phối. Vui lòng đăng nhập.');
+                setShipments([]);
+                return;
+            }
+
+            // Fetch real shipments data
+            const response = await distributorService.getShipmentsByRecipient(recipientAddress);
+            if (response.success && response.data) {
+                // Filter out invalid shipments (shipmentId = 0 or null)
+                const validShipments = response.data.filter(shipment => 
+                    shipment.shipmentId && shipment.shipmentId > 0
+                );
+                setShipments(validShipments);
+            } else {
+                setShipments([]);
+                setError(response.message || 'Không thể tải danh sách lô hàng');
+            }
         } catch (err) {
+            console.error('Error fetching shipments:', err);
             setError('Không thể tải danh sách lô hàng: ' + err.message);
+            setShipments([]);
         } finally {
             setLoading(false);
         }
     };
 
     const getStatusIcon = (status) => {
-        switch (status) {
+        switch (status?.toLowerCase()) {
             case 'pending':
                 return <Clock className="status-icon pending" />;
             case 'in_transit':
@@ -84,7 +63,7 @@ const ShipmentTracking = () => {
     };
 
     const getStatusText = (status) => {
-        switch (status) {
+        switch (status?.toLowerCase()) {
             case 'pending':
                 return 'Chờ xuất kho';
             case 'in_transit':
@@ -97,7 +76,7 @@ const ShipmentTracking = () => {
     };
 
     const getStatusClass = (status) => {
-        switch (status) {
+        switch (status?.toLowerCase()) {
             case 'pending':
                 return 'status-pending';
             case 'in_transit':
@@ -109,33 +88,38 @@ const ShipmentTracking = () => {
         }
     };
 
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        try {
+            return new Date(dateString).toLocaleDateString('vi-VN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch {
+            return 'N/A';
+        }
+    };
+
     const filteredShipments = shipments.filter(shipment => {
-        const matchesSearch = 
-            shipment.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            shipment.batchId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            shipment.trackingNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            shipment.drugName.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = searchTerm === '' || 
+            shipment.shipmentId?.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+            shipment.trackingInfo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            shipment.drugBatch?.drugName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            shipment.drugBatch?.batchNumber?.toLowerCase().includes(searchTerm.toLowerCase());
         
-        const matchesStatus = statusFilter === 'all' || shipment.status === statusFilter;
+        const matchesStatus = statusFilter === 'all' || shipment.status?.toLowerCase() === statusFilter;
         
         return matchesSearch && matchesStatus;
     });
 
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleString('vi-VN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
-
-    const trackShipment = (shipment) => {
+    const handleShipmentClick = (shipment) => {
         setSelectedShipment(shipment);
     };
 
-    const closeTrackingModal = () => {
+    const closeModal = () => {
         setSelectedShipment(null);
     };
 
@@ -143,7 +127,7 @@ const ShipmentTracking = () => {
         return (
             <div className="shipment-tracking">
                 <div className="loading-container">
-                    <div className="spinner"></div>
+                    <div className="loading-spinner"></div>
                     <p>Đang tải danh sách lô hàng...</p>
                 </div>
             </div>
@@ -155,9 +139,9 @@ const ShipmentTracking = () => {
             <div className="page-header">
                 <h1>
                     <Truck className="page-icon" />
-                    Theo dõi Lô hàng
+                    Theo dõi vận chuyển
                 </h1>
-                <p>Quản lý và theo dõi trạng thái các lô hàng đã gửi</p>
+                <p>Theo dõi tình trạng vận chuyển các lô hàng</p>
             </div>
 
             {error && (
@@ -167,19 +151,20 @@ const ShipmentTracking = () => {
                 </div>
             )}
 
-            <div className="controls">
+            {/* Search and Filter Controls */}
+            <div className="controls-section">
                 <div className="search-box">
                     <Search className="search-icon" />
                     <input
                         type="text"
-                        placeholder="Tìm kiếm theo mã lô hàng, mã batch, mã vận đơn hoặc tên thuốc..."
+                        placeholder="Tìm kiếm theo mã lô hàng, mã vận đơn, tên thuốc..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="search-input"
                     />
                 </div>
-
-                <div className="filter-box">
+                
+                <div className="filter-section">
                     <Filter className="filter-icon" />
                     <select
                         value={statusFilter}
@@ -192,170 +177,164 @@ const ShipmentTracking = () => {
                         <option value="delivered">Đã giao hàng</option>
                     </select>
                 </div>
+
+                <button 
+                    onClick={fetchShipments}
+                    className="btn btn-primary"
+                    disabled={loading}
+                >
+                    Làm mới
+                </button>
             </div>
 
-            <div className="shipments-grid">
+            {/* Shipments List */}
+            <div className="shipments-container">
                 {filteredShipments.length === 0 ? (
                     <div className="no-data">
-                        <Package size={64} className="no-data-icon" />
+                        <Package size={48} className="no-data-icon" />
                         <h3>Không có lô hàng nào</h3>
                         <p>
                             {searchTerm || statusFilter !== 'all' 
-                                ? 'Không tìm thấy lô hàng nào phù hợp với bộ lọc.'
-                                : 'Chưa có lô hàng nào được tạo.'
+                                ? 'Không tìm thấy lô hàng nào phù hợp với bộ lọc'
+                                : 'Chưa có lô hàng nào được gửi đến bạn'
                             }
                         </p>
                     </div>
                 ) : (
-                    filteredShipments.map(shipment => (
-                        <div key={shipment.id} className="shipment-card">
-                            <div className="card-header">
-                                <div className="shipment-id">
-                                    <Package size={20} />
-                                    <span>{shipment.id}</span>
-                                </div>
-                                <div className={`status-badge ${getStatusClass(shipment.status)}`}>
-                                    {getStatusIcon(shipment.status)}
-                                    {getStatusText(shipment.status)}
-                                </div>
-                            </div>
-
-                            <div className="card-content">
-                                <div className="info-row">
-                                    <span className="label">Mã Batch:</span>
-                                    <span className="value">{shipment.batchId}</span>
-                                </div>
-                                <div className="info-row">
-                                    <span className="label">Thuốc:</span>
-                                    <span className="value">{shipment.drugName}</span>
-                                </div>
-                                <div className="info-row">
-                                    <span className="label">Số lượng:</span>
-                                    <span className="value">{shipment.quantity} viên</span>
-                                </div>
-                                <div className="info-row">
-                                    <span className="label">Từ:</span>
-                                    <span className="value">{shipment.from}</span>
-                                </div>
-                                <div className="info-row">
-                                    <span className="label">Đến:</span>
-                                    <span className="value">{shipment.to}</span>
-                                </div>
-                                <div className="info-row">
-                                    <span className="label">Vị trí hiện tại:</span>
-                                    <span className="value">
-                                        <MapPin size={16} />
-                                        {shipment.currentLocation}
-                                    </span>
-                                </div>
-                                <div className="info-row">
-                                    <span className="label">Ngày tạo:</span>
-                                    <span className="value">{formatDate(shipment.createdAt)}</span>
-                                </div>
-                                {shipment.estimatedDelivery && (
-                                    <div className="info-row">
-                                        <span className="label">Dự kiến giao:</span>
-                                        <span className="value">{formatDate(shipment.estimatedDelivery)}</span>
+                    <div className="shipments-grid">
+                        {filteredShipments.map(shipment => (
+                            <div 
+                                key={shipment.id} 
+                                className="shipment-card"
+                                onClick={() => handleShipmentClick(shipment)}
+                            >
+                                <div className="shipment-header">
+                                    <div className="shipment-id">
+                                        <Package size={16} />
+                                        <span>SHIP-{shipment.shipmentId || shipment.id}</span>
                                     </div>
-                                )}
-                                {shipment.deliveredAt && (
-                                    <div className="info-row">
-                                        <span className="label">Đã giao lúc:</span>
-                                        <span className="value delivered">{formatDate(shipment.deliveredAt)}</span>
+                                    <div className={`status-badge ${getStatusClass(shipment.status)}`}>
+                                        {getStatusIcon(shipment.status)}
+                                        <span>{getStatusText(shipment.status)}</span>
                                     </div>
-                                )}
+                                </div>
+                                
+                                <div className="shipment-content">
+                                    <div className="drug-info">
+                                        <h4>{shipment.drugBatch?.drugName || 'N/A'}</h4>
+                                        <p>Lô: {shipment.drugBatch?.batchNumber || 'N/A'}</p>
+                                        <p>Số lượng: {shipment.quantity?.toLocaleString() || 'N/A'}</p>
+                                    </div>
+                                    
+                                    <div className="shipment-details">
+                                        <div className="detail-item">
+                                            <MapPin size={14} />
+                                            <span>Từ: {shipment.fromAddress || 'N/A'}</span>
+                                        </div>
+                                        <div className="detail-item">
+                                            <Clock size={14} />
+                                            <span>Ngày tạo: {formatDate(shipment.shipmentTimestamp)}</span>
+                                        </div>
+                                        {shipment.trackingInfo && (
+                                            <div className="detail-item">
+                                                <span>Ghi chú: {shipment.trackingInfo}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-
-                            <div className="card-actions">
-                                <button
-                                    onClick={() => trackShipment(shipment)}
-                                    className="btn btn-primary"
-                                >
-                                    <Search size={16} />
-                                    Chi tiết theo dõi
-                                </button>
-                            </div>
-                        </div>
-                    ))
+                        ))}
+                    </div>
                 )}
             </div>
 
-            {/* Tracking Detail Modal */}
+            {/* Shipment Detail Modal */}
             {selectedShipment && (
-                <div className="modal-overlay" onClick={closeTrackingModal}>
+                <div className="modal-overlay" onClick={closeModal}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2>Chi tiết theo dõi lô hàng {selectedShipment.id}</h2>
-                            <button onClick={closeTrackingModal} className="close-button">×</button>
+                            <h3>Chi tiết lô hàng SHIP-{selectedShipment.shipmentId}</h3>
+                            <button onClick={closeModal} className="modal-close">×</button>
                         </div>
+                        
                         <div className="modal-body">
-                            <div className="tracking-info">
-                                <div className="info-section">
-                                    <h3>Thông tin chung</h3>
-                                    <div className="info-grid">
-                                        <div className="info-item">
-                                            <span className="label">Mã vận đơn:</span>
-                                            <span className="value">{selectedShipment.trackingNumber}</span>
-                                        </div>
-                                        <div className="info-item">
-                                            <span className="label">Trạng thái:</span>
-                                            <span className={`value ${getStatusClass(selectedShipment.status)}`}>
-                                                {getStatusIcon(selectedShipment.status)}
-                                                {getStatusText(selectedShipment.status)}
-                                            </span>
-                                        </div>
-                                        <div className="info-item">
-                                            <span className="label">Vị trí hiện tại:</span>
-                                            <span className="value">
-                                                <MapPin size={16} />
-                                                {selectedShipment.currentLocation}
-                                            </span>
+                            <div className="detail-section">
+                                <h4>Thông tin chung</h4>
+                                <div className="detail-grid">
+                                    <div className="detail-item">
+                                        <strong>Mã shipment:</strong>
+                                        <span>SHIP-{selectedShipment.shipmentId}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <strong>Trạng thái:</strong>
+                                        <div className={`status-badge ${getStatusClass(selectedShipment.status)}`}>
+                                            {getStatusIcon(selectedShipment.status)}
+                                            <span>{getStatusText(selectedShipment.status)}</span>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div className="info-section">
-                                    <h3>Lịch sử di chuyển</h3>
-                                    <div className="timeline">
-                                        <div className="timeline-item completed">
-                                            <div className="timeline-icon">
-                                                <CheckCircle size={20} />
-                                            </div>
-                                            <div className="timeline-content">
-                                                <div className="timeline-title">Tạo lô hàng</div>
-                                                <div className="timeline-date">{formatDate(selectedShipment.createdAt)}</div>
-                                                <div className="timeline-location">Xuất phát từ {selectedShipment.from}</div>
-                                            </div>
-                                        </div>
-
-                                        {selectedShipment.status !== 'pending' && (
-                                            <div className="timeline-item completed">
-                                                <div className="timeline-icon">
-                                                    <Truck size={20} />
-                                                </div>
-                                                <div className="timeline-content">
-                                                    <div className="timeline-title">Bắt đầu vận chuyển</div>
-                                                    <div className="timeline-date">{formatDate(selectedShipment.createdAt)}</div>
-                                                    <div className="timeline-location">Rời khỏi kho xuất phát</div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {selectedShipment.status === 'delivered' && (
-                                            <div className="timeline-item completed">
-                                                <div className="timeline-icon">
-                                                    <CheckCircle size={20} />
-                                                </div>
-                                                <div className="timeline-content">
-                                                    <div className="timeline-title">Giao hàng thành công</div>
-                                                    <div className="timeline-date">{formatDate(selectedShipment.deliveredAt)}</div>
-                                                    <div className="timeline-location">Đã giao đến {selectedShipment.to}</div>
-                                                </div>
-                                            </div>
-                                        )}
+                                    <div className="detail-item">
+                                        <strong>Địa chỉ gửi:</strong>
+                                        <span>{selectedShipment.fromAddress || 'N/A'}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <strong>Địa chỉ nhận:</strong>
+                                        <span>{selectedShipment.toAddress || 'N/A'}</span>
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="detail-section">
+                                <h4>Thông tin thuốc</h4>
+                                <div className="detail-grid">
+                                    <div className="detail-item">
+                                        <strong>Tên thuốc:</strong>
+                                        <span>{selectedShipment.drugBatch?.drugName || 'N/A'}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <strong>Số lô:</strong>
+                                        <span>{selectedShipment.drugBatch?.batchNumber || 'N/A'}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <strong>Nhà sản xuất:</strong>
+                                        <span>{selectedShipment.drugBatch?.manufacturer || 'N/A'}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <strong>Số lượng:</strong>
+                                        <span>{selectedShipment.quantity?.toLocaleString() || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="detail-section">
+                                <h4>Thời gian</h4>
+                                <div className="detail-grid">
+                                    <div className="detail-item">
+                                        <strong>Ngày tạo:</strong>
+                                        <span>{formatDate(selectedShipment.shipmentTimestamp)}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <strong>Cập nhật cuối:</strong>
+                                        <span>{formatDate(selectedShipment.updatedAt)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {selectedShipment.trackingInfo && (
+                                <div className="detail-section">
+                                    <h4>Ghi chú</h4>
+                                    <p>{selectedShipment.trackingInfo}</p>
+                                </div>
+                            )}
+
+                            {selectedShipment.transactionHash && (
+                                <div className="detail-section">
+                                    <h4>Blockchain</h4>
+                                    <div className="detail-item">
+                                        <strong>Transaction Hash:</strong>
+                                        <span className="hash-text">{selectedShipment.transactionHash}</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

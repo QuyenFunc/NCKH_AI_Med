@@ -143,10 +143,9 @@ services:
       # Other configurations
       BLOCKSCOUT_VERSION: v6.8.1
       RELEASE_VERSION: 6.8.1
-      BLOCKSCOUT_HOST: 0.0.0.0
+      BLOCKSCOUT_HOST: localhost:3000
       BLOCKSCOUT_PROTOCOL: http
       SECRET_KEY_BASE: RMgI4C1HSkxsEjdhtGMfwAHfyT6CKWXOgzCboJflfSm4jeAlic52io05KB6mqzc5
-      CHECK_ORIGIN: "false"
       PORT: 4000
       MAILER_SMTP_ENABLED: "false"
       BLOCK_TRANSFORMER: base
@@ -158,53 +157,17 @@ services:
       NETWORK_ICON: "_network_icon.html"
       HOMEPAGE_PLATE_BACKGROUND_COLOR: "rgb(46, 125, 50)"
       HOMEPAGE_PLATE_TEXT_COLOR: "white"
-      
-      # Indexer performance tuning for development - COMPLETELY DISABLED
-      INDEXER_DISABLED: "true"
-      INDEXER_BLOCK_INTERVAL: "99999999"
-      INDEXER_RECEIPTS_BATCH_SIZE: "1"
-      INDEXER_RECEIPTS_CONCURRENCY: "1"
-      INDEXER_BLOCKS_BATCH_SIZE: "1"
-      INDEXER_BLOCKS_CONCURRENCY: "1"
-      BLOCK_CATCHUP_BATCH_SIZE: "1"
-      BLOCK_CATCHUP_CONCURRENCY: "1"
-      
-      # Disable ALL fetchers and background processes
+
+      # Disable các fetchers không cần thiết để giảm log spam
+      INDEXER_DISABLE_INTERNAL_TRANSACTIONS_FETCHER: "true"
+      INDEXER_DISABLE_PENDING_TRANSACTIONS_FETCHER: "true"
+      INDEXER_DISABLE_EMPTY_BLOCKS_SANITIZER: "true"
+      INDEXER_DISABLE_CATALOG_FETCHER: "true"
       INDEXER_DISABLE_BLOCK_REWARD_FETCHER: "true"
       INDEXER_DISABLE_COIN_BALANCE_FETCHER: "true"
-      INDEXER_DISABLE_TOKEN_BALANCE_FETCHER: "true"
-      INDEXER_DISABLE_EMPTY_BLOCKS_SANITIZER: "true"
-      INDEXER_DISABLE_CATALOGED_TOKEN_UPDATER: "true"
-      INDEXER_DISABLE_UNCATALOGED_TOKEN_BALANCE_FETCHER: "true"
-      
-      # Disable block catchup mechanism completely
-      DISABLE_BLOCK_CATCH_UP: "true"
-      DISABLE_CATCHUP_INDEXER: "true"
-      INDEXER_CATCHUP_DISABLED: "true"
-      
-      # Additional fetchers to disable for dev environment
-      INDEXER_DISABLE_PENDING_TRANSACTIONS_FETCHER: "true"
-      INDEXER_DISABLE_INTERNAL_TRANSACTIONS_FETCHER: "true"
       INDEXER_DISABLE_TOKEN_INSTANCE_FETCHER: "true"
-      INDEXER_DISABLE_TOKEN_INSTANCE_LEGACY_SANITIZER: "true"
-      INDEXER_DISABLE_TOKEN_INSTANCE_SANITIZER: "true"
-      
-      # Disable real-time indexing for development
-      DISABLE_REALTIME_INDEXER: "true"
-      REALTIME_INDEXER: "false"
-      INDEXER_REALTIME_DISABLED: "true"
-      
-      # Block processing limits - set to minimal
-      BLOCK_CATCHUP_DELAY: "999999999"
-      FIRST_BLOCK: "latest"
-      LAST_BLOCK: "latest"
-      INDEXER_START_BLOCK: "latest"
-      INDEXER_CATCHUP_STARTING_BLOCK_SHIFT: "0"
-      
-      # Additional settings to prevent loops
-      INDEXER_EMPTY_BLOCKS_SANITIZER_BATCH_SIZE: "1"
-      INDEXER_TOKEN_BALANCES_BATCH_SIZE: "1"
-      INDEXER_TOKEN_INSTANCES_SANITIZER_BATCH_SIZE: "1"
+      # Indexer configuration - chỉ bật khi cần
+      INDEXER_ENABLED: "false"
 
       # Disable SSL requirement for development
       FORCE_SSL: "false"
@@ -212,34 +175,27 @@ services:
       # WebSocket configuration
       WEBSOCKET_V2_ENABLED: "true"
       
-      # CORS configuration - FIXED
-      ENABLE_CORS: "true"
-      CORS_ALLOWED_ORIGINS: "http://localhost:3000"
-      CORS_ALLOWED_HEADERS: "accept,accept-encoding,authorization,content-type,updated-gas-oracle,x-requested-with,access-control-allow-origin,access-control-allow-headers,access-control-allow-methods"
-
-      CORS_ALLOWED_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
-      CORS_ALLOW_CREDENTIALS: "true"
-      CORS_MAX_AGE: "86400"
-      CORS_EXPOSED_HEADERS: "*"
+      # CORS handled by Nginx - no backend CORS needed
       
       # Additional performance optimizations
       HEART_BEAT_TIMEOUT: "60000"
       HEART_COMMAND_TIMEOUT: "60000"
       
-      # Indexer timing optimizations
-      INDEXER_CATCHUP_BLOCKS_BATCH_SIZE: "1"
-      INDEXER_CATCHUP_BLOCKS_CONCURRENCY: "1"
-      INDEXER_MEMORY_LIMIT: "1000000000"
+      # Disable indexer timing optimizations khi indexer tắt
+      # INDEXER_CATCHUP_BLOCKS_BATCH_SIZE: "1"
+      # INDEXER_CATCHUP_BLOCKS_CONCURRENCY: "1"
+      # INDEXER_MEMORY_LIMIT: "1000000000"
       
-      # Logging level
-      LOG_LEVEL: "warn"
+      # Logging level - chỉ hiển thị errors
+      LOG_LEVEL: "error"
+      EXQ_LOG_LEVEL: "error"
       
       # Additional API settings to ensure compatibility
       API_V2_ENABLED: "true"
       API_RATE_LIMIT: "false"
       
-    ports:
-      - "4000:4000"
+    expose:
+      - "4000"
     volumes:
       - ./logs/:/opt/app/logs/
     extra_hosts:
@@ -278,7 +234,7 @@ services:
       NEXT_PUBLIC_API_HOST: localhost
       NEXT_PUBLIC_API_PORT: 3000
       NEXT_PUBLIC_API_PROTOCOL: http
-      NEXT_PUBLIC_API_BASE_PATH: /api
+      NEXT_PUBLIC_API_BASE_PATH: "/api"
       NEXT_PUBLIC_API_WEBSOCKET_PROTOCOL: ws
       
       # Network configuration

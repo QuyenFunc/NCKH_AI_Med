@@ -21,6 +21,9 @@ public class ShipmentDto {
 
     private Long id;
 
+    @Size(max = 100, message = "Mã shipment không được vượt quá 100 ký tự")
+    private String shipmentCode;
+
     @NotNull(message = "Shipment ID không được để trống")
     private BigInteger shipmentId;
 
@@ -61,4 +64,9 @@ public class ShipmentDto {
 
     private DrugBatchDto drugBatch;
     private List<BlockchainTransactionDto> transactions;
+
+    // Helper method to get batch ID from drug batch
+    public BigInteger getBatchId() {
+        return drugBatch != null ? drugBatch.getBatchId() : null;
+    }
 }

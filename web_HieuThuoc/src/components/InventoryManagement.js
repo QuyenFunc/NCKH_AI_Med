@@ -10,7 +10,7 @@ import {
   BarChart3,
   Download
 } from 'lucide-react';
-// import pharmacyService from '../services/apiService';
+import pharmacyService from '../services/apiService';
 import './InventoryManagement.css';
 
 const InventoryManagement = () => {
@@ -50,107 +50,22 @@ const InventoryManagement = () => {
     try {
       setLoading(true);
       
-      // Mock data for pharmacy inventory
-      const mockInventory = [
-        {
-          id: 1,
-          name: 'Paracetamol 500mg',
-          batchCode: 'BT2024001',
-          category: 'Giảm đau hạ sốt',
-          manufacturer: 'Công ty Dược ABC',
-          currentStock: 850,
-          minStock: 100,
-          maxStock: 2000,
-          unitPrice: 500,
-          totalValue: 425000,
-          expiryDate: '2027-09-15',
-          manufactureDate: '2024-09-15',
-          location: 'Kệ A1-01',
-          lastUpdated: '2024-09-18T10:30:00Z',
-          status: 'good',
-          storageConditions: 'Nơi khô ráo, nhiệt độ dưới 30°C'
-        },
-        {
-          id: 2,
-          name: 'Amoxicillin 250mg',
-          batchCode: 'BT2024002',
-          category: 'Kháng sinh',
-          manufacturer: 'Công ty Dược DEF',
-          currentStock: 45,
-          minStock: 50,
-          maxStock: 500,
-          unitPrice: 1200,
-          totalValue: 54000,
-          expiryDate: '2026-09-16',
-          manufactureDate: '2024-09-16',
-          location: 'Kệ B2-03',
-          lastUpdated: '2024-09-17T14:20:00Z',
-          status: 'low_stock',
-          storageConditions: 'Nơi khô ráo, tránh ánh sáng'
-        },
-        {
-          id: 3,
-          name: 'Vitamin C 1000mg',
-          batchCode: 'BT2024003',
-          category: 'Vitamin & KCS',
-          manufacturer: 'Công ty Dược GHI',
-          currentStock: 150,
-          minStock: 80,
-          maxStock: 800,
-          unitPrice: 800,
-          totalValue: 120000,
-          expiryDate: '2025-01-10',
-          manufactureDate: '2024-01-10',
-          location: 'Kệ C1-05',
-          lastUpdated: '2024-09-16T09:15:00Z',
-          status: 'expiring_soon',
-          storageConditions: 'Nơi khô ráo, nhiệt độ dưới 25°C'
-        },
-        {
-          id: 4,
-          name: 'Metformin 500mg',
-          batchCode: 'BT2024004',
-          category: 'Thuốc tiêu hóa',
-          manufacturer: 'Công ty Dược JKL',
-          currentStock: 320,
-          minStock: 100,
-          maxStock: 1000,
-          unitPrice: 750,
-          totalValue: 240000,
-          expiryDate: '2026-12-20',
-          manufactureDate: '2024-06-20',
-          location: 'Kệ D3-02',
-          lastUpdated: '2024-09-15T16:45:00Z',
-          status: 'good',
-          storageConditions: 'Nơi khô ráo, nhiệt độ phòng'
-        },
-        {
-          id: 5,
-          name: 'Aspirin 100mg',
-          batchCode: 'BT2024005',
-          category: 'Thuốc tim mạch',
-          manufacturer: 'Công ty Dược MNO',
-          currentStock: 25,
-          minStock: 30,
-          maxStock: 300,
-          unitPrice: 600,
-          totalValue: 15000,
-          expiryDate: '2024-11-30',
-          manufactureDate: '2023-11-30',
-          location: 'Kệ E1-04',
-          lastUpdated: '2024-09-14T11:30:00Z',
-          status: 'expiring_soon',
-          storageConditions: 'Nơi khô ráo, tránh ánh sáng trực tiếp'
-        }
-      ];
-
-      setInventory(mockInventory);
+      // Get real inventory data from API
+      const response = await pharmacyService.getInventory();
+      if (response.success) {
+        setInventory(response.data);
+      } else {
+        console.error('Failed to fetch inventory:', response.message);
+        setInventory([]);
+      }
     } catch (error) {
       console.error('Error fetching inventory:', error);
+      setInventory([]);
     } finally {
       setLoading(false);
     }
   };
+
 
   const applyFiltersAndSort = () => {
     let filtered = [...inventory];
@@ -286,7 +201,11 @@ const InventoryManagement = () => {
   if (loading) {
     return (
       <div className="inventory-management">
-        <div className="loading">Đang tải dữ liệu kho...</div>
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <div className="loading-text">Đang tải dữ liệu kho từ blockchain...</div>
+          <div className="loading-subtitle">Vui lòng chờ trong giây lát</div>
+        </div>
       </div>
     );
   }
@@ -414,8 +333,28 @@ const InventoryManagement = () => {
             {filteredInventory.length === 0 ? (
               <tr>
                 <td colSpan="10" className="no-data">
-                  <Package size={48} />
-                  <p>Không có sản phẩm nào phù hợp</p>
+                  <div className="empty-state">
+                    <Package size={64} className="empty-icon" />
+                    <h3>Không có sản phẩm nào</h3>
+                    <p>
+                      {searchTerm || filterStatus !== 'all' || filterCategory !== 'all' 
+                        ? 'Không tìm thấy sản phẩm phù hợp với bộ lọc'
+                        : 'Kho hiện tại chưa có sản phẩm nào. Vui lòng nhập hàng từ nhà phân phối.'
+                      }
+                    </p>
+                    {(searchTerm || filterStatus !== 'all' || filterCategory !== 'all') && (
+                      <button 
+                        onClick={() => {
+                          setSearchTerm('');
+                          setFilterStatus('all');
+                          setFilterCategory('all');
+                        }}
+                        className="btn btn-secondary"
+                      >
+                        Xóa bộ lọc
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (

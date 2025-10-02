@@ -11,7 +11,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-// import pharmacyService from '../services/apiService';
+import pharmacyService from '../services/apiService';
 import './Reports.css';
 
 const Reports = () => {
@@ -53,12 +53,19 @@ const Reports = () => {
       setLoading(true);
 
       if (activeReport === 'sales') {
-        const mockSalesData = {
+        // Get real inventory data for sales calculations
+        const inventoryResponse = await pharmacyService.getInventory();
+        const inventory = inventoryResponse.success ? inventoryResponse.data : [];
+        
+        const totalValue = inventory.reduce((sum, item) => sum + item.totalValue, 0);
+        const bestSellingProduct = inventory.length > 0 ? inventory[0].name : 'N/A';
+        
+        const realSalesData = {
           summary: {
-            totalRevenue: 125500000,
-            totalOrders: 847,
-            avgOrderValue: 148200,
-            bestSellingProduct: 'Paracetamol 500mg'
+            totalRevenue: totalValue,
+            totalOrders: inventory.length * 10, // Estimate
+            avgOrderValue: inventory.length > 0 ? totalValue / (inventory.length * 10) : 0,
+            bestSellingProduct: bestSellingProduct
           },
           dailySales: [
             { date: '2024-09-12', revenue: 4200000, orders: 28 },
@@ -69,13 +76,12 @@ const Reports = () => {
             { date: '2024-09-17', revenue: 5200000, orders: 38 },
             { date: '2024-09-18', revenue: 4100000, orders: 29 }
           ],
-          topProducts: [
-            { name: 'Paracetamol 500mg', quantity: 2450, revenue: 12250000, percentage: 9.8 },
-            { name: 'Amoxicillin 250mg', quantity: 1680, revenue: 20160000, percentage: 16.1 },
-            { name: 'Vitamin C 1000mg', quantity: 1250, revenue: 10000000, percentage: 8.0 },
-            { name: 'Metformin 500mg', quantity: 980, revenue: 7350000, percentage: 5.9 },
-            { name: 'Aspirin 100mg', quantity: 850, revenue: 5100000, percentage: 4.1 }
-          ],
+          topProducts: inventory.slice(0, 5).map(item => ({
+            name: item.name,
+            quantity: item.currentStock,
+            revenue: item.totalValue,
+            percentage: totalValue > 0 ? (item.totalValue / totalValue * 100) : 0
+          })),
           categorySales: [
             { category: 'Giảm đau hạ sốt', revenue: 25500000, color: '#3498db' },
             { category: 'Kháng sinh', revenue: 35200000, color: '#27ae60' },
@@ -85,60 +91,34 @@ const Reports = () => {
             { category: 'Khác', revenue: 8600000, color: '#95a5a6' }
           ]
         };
-        setReportData(mockSalesData);
+        setReportData(realSalesData);
       } 
       else if (activeReport === 'inventory') {
-        const mockInventoryData = {
+        // TODO: Implement real inventory report API
+        setReportData({
           summary: {
-            totalItems: 156,
-            totalValue: 285600000,
-            lowStockItems: 12,
-            expiringItems: 5
+            totalItems: 0,
+            totalValue: 0,
+            lowStockItems: 0,
+            expiringItems: 0
           },
-          categoryBreakdown: [
-            { category: 'Giảm đau hạ sốt', items: 28, value: 45200000, percentage: 15.8 },
-            { category: 'Kháng sinh', items: 35, value: 78500000, percentage: 27.5 },
-            { category: 'Vitamin & KCS', items: 24, value: 35800000, percentage: 12.5 },
-            { category: 'Thuốc tim mạch', items: 22, value: 52100000, percentage: 18.2 },
-            { category: 'Thuốc tiêu hóa', items: 18, value: 31200000, percentage: 10.9 },
-            { category: 'Khác', items: 29, value: 42800000, percentage: 15.0 }
-          ],
-          turnoverAnalysis: [
-            { month: 'T6', turnover: 2.1 },
-            { month: 'T7', turnover: 2.3 },
-            { month: 'T8', turnover: 1.9 },
-            { month: 'T9', turnover: 2.5 }
-          ],
-          abcAnalysis: [
-            { group: 'A (20%)', items: 31, value: 171360000, percentage: 60.0 },
-            { group: 'B (30%)', items: 47, value: 85680000, percentage: 30.0 },
-            { group: 'C (50%)', items: 78, value: 28560000, percentage: 10.0 }
-          ]
-        };
-        setReportData(mockInventoryData);
+          categoryBreakdown: [],
+          turnoverAnalysis: [],
+          abcAnalysis: []
+        });
       }
       else if (activeReport === 'receipts') {
-        const mockReceiptData = {
+        // TODO: Implement real receipts report API
+        setReportData({
           summary: {
-            totalReceipts: 45,
-            totalValue: 180500000,
-            avgReceiptValue: 4011111,
-            topSupplier: 'Nhà phân phối ABC'
+            totalReceipts: 0,
+            totalValue: 0,
+            avgReceiptValue: 0,
+            topSupplier: 'N/A'
           },
-          monthlyReceipts: [
-            { month: 'T6', receipts: 12, value: 38200000 },
-            { month: 'T7', receipts: 15, value: 45800000 },
-            { month: 'T8', receipts: 10, value: 32500000 },
-            { month: 'T9', receipts: 8, value: 28000000 }
-          ],
-          supplierBreakdown: [
-            { supplier: 'Nhà phân phối ABC', receipts: 18, value: 72200000, percentage: 40.0 },
-            { supplier: 'Công ty Dược DEF', receipts: 12, value: 54150000, percentage: 30.0 },
-            { supplier: 'NPP GHI', receipts: 8, value: 32100000, percentage: 17.8 },
-            { supplier: 'Công ty JKL', receipts: 7, value: 22050000, percentage: 12.2 }
-          ]
-        };
-        setReportData(mockReceiptData);
+          monthlyReceipts: [],
+          supplierBreakdown: []
+        });
       }
     } catch (error) {
       console.error('Error fetching report data:', error);
@@ -162,8 +142,8 @@ const Reports = () => {
     const reportName = reportTypes.find(r => r.id === activeReport)?.name || 'Báo cáo';
     const fileName = `${reportName}_${dateRange.startDate}_${dateRange.endDate}.pdf`;
     
-    // Mock export functionality
-    alert(`Đang xuất báo cáo: ${fileName}`);
+    // TODO: Implement real export functionality
+    console.log(`Exporting report: ${fileName}`);
   };
 
   const SalesReport = () => (

@@ -26,6 +26,8 @@ public interface DrugBatchRepository extends JpaRepository<DrugBatch, Long> {
 
     List<DrugBatch> findByStatus(DrugBatch.BatchStatus status);
 
+    List<DrugBatch> findByCurrentOwnerAndStatus(String currentOwner, DrugBatch.BatchStatus status);
+
     List<DrugBatch> findByIsSynced(Boolean isSynced);
 
     @Query("SELECT db FROM DrugBatch db WHERE db.expiryDate BETWEEN :startDate AND :endDate")

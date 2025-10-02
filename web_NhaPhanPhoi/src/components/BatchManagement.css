@@ -277,6 +277,11 @@
   color: #92400e;
 }
 
+.status-in-transit {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
 /* Action Buttons */
 .action-buttons {
   display: flex;

@@ -12,13 +12,19 @@ import {
   User,
   Settings,
   Factory,
-  Users
+  Users,
+  LogOut,
+  ChevronDown,
+  Building2
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import './Layout.css';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
+  const { user, logout } = useAuth();
 
   const navigationItems = [
     {
@@ -94,13 +100,20 @@ const Layout = ({ children }) => {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="company-info">
-            <div className="company-logo">
-              <Factory size={24} />
+          <div className="user-info">
+            <div className="user-avatar">
+              <Building2 size={16} />
             </div>
-            <div className="company-details">
-              <div className="company-name">Công ty Dược ABC</div>
-              <div className="company-role">Nhà sản xuất</div>
+            <div className="user-details">
+              <div className="user-name">{user?.name || 'Người dùng'}</div>
+              <div className="user-role">{user?.companyName || 'Công ty'}</div>
+              <div className="user-status">
+                {user?.isVerified ? (
+                  <span className="status-verified">✓ Đã xác minh</span>
+                ) : (
+                  <span className="status-pending">⏳ Chờ xác minh</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -127,17 +140,56 @@ const Layout = ({ children }) => {
               <Bell size={20} />
               <span className="notification-badge">3</span>
             </button>
-            
-            <div className="user-menu">
-              <button className="user-btn">
-                <User size={20} />
-                <span>Admin</span>
-              </button>
-            </div>
 
-            <button className="header-btn">
-              <Settings size={20} />
-            </button>
+            <div className="user-menu-container">
+              <button 
+                className="user-menu-trigger"
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+              >
+                <div className="user-avatar-small">
+                  <User size={16} />
+                </div>
+                <span className="user-name-header">{user?.name}</span>
+                <ChevronDown size={16} />
+              </button>
+
+              {userMenuOpen && (
+                <div className="user-menu-dropdown">
+                  <div className="user-menu-header">
+                    <div className="user-info-header">
+                      <strong>{user?.name}</strong>
+                      <small>{user?.email}</small>
+                      <small>{user?.companyName}</small>
+                    </div>
+                  </div>
+                  
+                  <div className="user-menu-divider"></div>
+                  
+                  <button className="user-menu-item">
+                    <Settings size={16} />
+                    <span>Cài đặt</span>
+                  </button>
+                  
+                  <button className="user-menu-item">
+                    <User size={16} />
+                    <span>Hồ sơ</span>
+                  </button>
+                  
+                  <div className="user-menu-divider"></div>
+                  
+                  <button 
+                    className="user-menu-item logout"
+                    onClick={() => {
+                      logout();
+                      setUserMenuOpen(false);
+                    }}
+                  >
+                    <LogOut size={16} />
+                    <span>Đăng xuất</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

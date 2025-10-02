@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { TrendingUp, Package, Truck, CheckCircle, Download, Calendar, Filter } from 'lucide-react';
+import { distributorService } from '../services/apiService';
 import './Reports.css';
 
 const Reports = () => {
@@ -19,14 +20,18 @@ const Reports = () => {
             // Mock data - replace with actual API call
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            const mockData = {
+            // Get real data from API
+            const batchesResponse = await distributorService.getBatches();
+            const batches = batchesResponse.success ? batchesResponse.data : [];
+            
+            const realData = {
                 overview: {
-                    totalBatches: 145,
-                    totalShipments: 89,
-                    deliveredShipments: 67,
-                    pendingShipments: 22,
-                    totalValue: 2450000000,
-                    growth: 12.5
+                    totalBatches: batches.length,
+                    totalShipments: 0, // TODO: Implement shipments API
+                    deliveredShipments: 0,
+                    pendingShipments: 0,
+                    totalValue: batches.reduce((sum, batch) => sum + (batch.quantity * 5000), 0), // Estimate value
+                    growth: 0 // TODO: Calculate growth
                 },
                 monthlyShipments: [
                     { month: 'T1', shipments: 45, delivered: 42, value: 890000000 },
@@ -41,13 +46,11 @@ const Reports = () => {
                     { name: 'Đang vận chuyển', value: 15, color: '#3498db' },
                     { name: 'Chờ xuất kho', value: 7, color: '#f39c12' }
                 ],
-                topDrugs: [
-                    { name: 'Paracetamol 500mg', shipments: 25, quantity: 5000 },
-                    { name: 'Amoxicillin 250mg', shipments: 18, quantity: 3600 },
-                    { name: 'Vitamin C 1000mg', shipments: 15, quantity: 4500 },
-                    { name: 'Ibuprofen 400mg', shipments: 12, quantity: 2400 },
-                    { name: 'Aspirin 325mg', shipments: 10, quantity: 2000 }
-                ],
+                topDrugs: batches.map(batch => ({
+                    name: batch.drugName,
+                    shipments: 1, // TODO: Count actual shipments
+                    quantity: batch.quantity
+                })).slice(0, 5),
                 performanceMetrics: {
                     avgDeliveryTime: 2.3,
                     onTimeDelivery: 94.5,
@@ -56,7 +59,7 @@ const Reports = () => {
                 }
             };
             
-            setReportData(mockData);
+            setReportData(realData);
         } catch (err) {
             console.error('Error fetching report data:', err);
         } finally {

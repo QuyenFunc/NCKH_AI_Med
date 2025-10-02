@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 
 const AuthContext = createContext();
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 
 export function useAuth() {
   return useContext(AuthContext);
@@ -12,38 +15,58 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     // Check if user is logged in (from localStorage)
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    const storedUser = localStorage.getItem('pharmacy_user');
+    const storedToken = localStorage.getItem('pharmacy_token');
+    if (storedUser && storedToken) {
       setUser(JSON.parse(storedUser));
     }
     setLoading(false);
   }, []);
 
-  const login = (email, password) => {
-    // Mock authentication - trong thực tế sẽ gọi API
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (email && password) {
-          const userData = {
-            id: 1,
-            email: email,
-            name: email.includes('distributor') ? 'Nhà Phân Phối ABC' : 'Hiệu Thuốc XYZ',
-            role: email.includes('distributor') ? 'distributor' : 'pharmacy',
-            avatar: '/api/placeholder/40/40'
-          };
-          setUser(userData);
-          localStorage.setItem('user', JSON.stringify(userData));
-          resolve(userData);
-        } else {
-          reject(new Error('Email hoặc mật khẩu không đúng'));
-        }
-      }, 1000);
-    });
+  const login = async (email, password) => {
+    try {
+      // Call pharmacy login API
+      const response = await axios.post(`${API_BASE_URL}/pharmacy/auth/login`, {
+        email,
+        password
+      });
+
+      if (response.data.success && response.data.data) {
+        const authData = response.data.data;
+        const pharmacy = authData.user;
+        
+        const userData = {
+          id: pharmacy.id,
+          email: pharmacy.email,
+          name: pharmacy.pharmacyName,
+          role: 'pharmacy',
+          walletAddress: pharmacy.walletAddress,
+          pharmacyCode: pharmacy.pharmacyCode,
+          address: pharmacy.address,
+          phone: pharmacy.phone,
+          avatar: '/api/placeholder/40/40'
+        };
+        
+        setUser(userData);
+        localStorage.setItem('pharmacy_user', JSON.stringify(userData));
+        localStorage.setItem('pharmacy_token', authData.accessToken);
+        localStorage.setItem('walletAddress', pharmacy.walletAddress);
+        
+        return userData;
+      } else {
+        throw new Error(response.data.message || 'Đăng nhập thất bại');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Email hoặc mật khẩu không đúng');
+    }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
+    localStorage.removeItem('pharmacy_user');
+    localStorage.removeItem('pharmacy_token');
+    localStorage.removeItem('walletAddress');
   };
 
   const value = {

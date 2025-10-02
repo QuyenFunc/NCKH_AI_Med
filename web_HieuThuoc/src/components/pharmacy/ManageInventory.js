@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   Filter, 
@@ -11,6 +11,7 @@ import {
   TrendingDown,
   Clock
 } from 'lucide-react';
+import pharmacyService from '../../services/apiService';
 import './ManageInventory.css';
 
 function ManageInventory() {
@@ -19,122 +20,62 @@ function ManageInventory() {
   const [expiryFilter, setExpiryFilter] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
+  
+  // Real data from API
+  const [inventoryData, setInventoryData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data cho sản phẩm trong kho
-  const inventoryData = [
-    {
-      id: 1,
-      name: 'Paracetamol 500mg',
-      manufacturer: 'Công ty Dược ABC',
-      batchNumber: 'LOT2024001',
-      quantity: 850,
-      originalQuantity: 1000,
-      unit: 'viên',
-      manufactureDate: '2024-01-01',
-      expireDate: '2025-12-31',
-      registrationNumber: 'VD-12345-67',
-      status: 'in_stock',
-      receivedDate: '2024-01-17',
-      distributorName: 'Nhà phân phối ABC',
-      shipmentId: 'LOT001234',
-      location: 'Kệ A1-01',
-      price: 500,
-      history: [
-        { date: '2024-01-17', action: 'Nhập kho', quantity: 1000, note: 'Nhận từ Nhà phân phối ABC' },
-        { date: '2024-01-18', action: 'Xuất bán', quantity: -50, note: 'Bán lẻ' },
-        { date: '2024-01-19', action: 'Xuất bán', quantity: -100, note: 'Đơn hàng lớn' }
-      ]
-    },
-    {
-      id: 2,
-      name: 'Amoxicillin 250mg',
-      manufacturer: 'Công ty Dược XYZ',
-      batchNumber: 'LOT2024002',
-      quantity: 350,
-      originalQuantity: 500,
-      unit: 'viên',
-      manufactureDate: '2023-12-01',
-      expireDate: '2025-06-30',
-      registrationNumber: 'VD-12345-68',
-      status: 'in_stock',
-      receivedDate: '2024-01-17',
-      distributorName: 'Nhà phân phối ABC',
-      shipmentId: 'LOT001234',
-      location: 'Kệ A1-02',
-      price: 1200,
-      history: [
-        { date: '2024-01-17', action: 'Nhập kho', quantity: 500, note: 'Nhận từ Nhà phân phối ABC' },
-        { date: '2024-01-18', action: 'Xuất bán', quantity: -150, note: 'Bán theo đơn' }
-      ]
-    },
-    {
-      id: 3,
-      name: 'Vitamin C 1000mg',
-      manufacturer: 'Công ty Dược DEF',
-      batchNumber: 'LOT2024003',
-      quantity: 1800,
-      originalQuantity: 2000,
-      unit: 'viên',
-      manufactureDate: '2024-01-10',
-      expireDate: '2026-01-10',
-      registrationNumber: 'VD-12345-69',
-      status: 'in_stock',
-      receivedDate: '2024-01-16',
-      distributorName: 'Nhà phân phối XYZ',
-      shipmentId: 'LOT001233',
-      location: 'Kệ B2-05',
-      price: 800,
-      history: [
-        { date: '2024-01-16', action: 'Nhập kho', quantity: 2000, note: 'Nhận từ Nhà phân phối XYZ' },
-        { date: '2024-01-17', action: 'Xuất bán', quantity: -200, note: 'Bán lẻ' }
-      ]
-    },
-    {
-      id: 4,
-      name: 'Aspirin 300mg',
-      manufacturer: 'Công ty Dược GHI',
-      batchNumber: 'LOT2024004',
-      quantity: 50,
-      originalQuantity: 800,
-      unit: 'viên',
-      manufactureDate: '2023-06-01',
-      expireDate: '2024-06-01',
-      registrationNumber: 'VD-12345-70',
-      status: 'low_stock',
-      receivedDate: '2024-01-15',
-      distributorName: 'Nhà phân phối DEF',
-      shipmentId: 'LOT001232',
-      location: 'Kệ C3-01',
-      price: 600,
-      history: [
-        { date: '2024-01-15', action: 'Nhập kho', quantity: 800, note: 'Nhận từ Nhà phân phối DEF' },
-        { date: '2024-01-16', action: 'Xuất bán', quantity: -300, note: 'Đơn hàng lớn' },
-        { date: '2024-01-17', action: 'Xuất bán', quantity: -450, note: 'Bán theo đơn' }
-      ]
-    },
-    {
-      id: 5,
-      name: 'Ibuprofen 400mg',
-      manufacturer: 'Công ty Dược JKL',
-      batchNumber: 'LOT2024005',
-      quantity: 420,
-      originalQuantity: 600,
-      unit: 'viên',
-      manufactureDate: '2023-08-01',
-      expireDate: '2024-02-15',
-      registrationNumber: 'VD-12345-71',
-      status: 'expired_soon',
-      receivedDate: '2024-01-15',
-      distributorName: 'Nhà phân phối DEF',
-      shipmentId: 'LOT001232',
-      location: 'Kệ C3-02',
-      price: 900,
-      history: [
-        { date: '2024-01-15', action: 'Nhập kho', quantity: 600, note: 'Nhận từ Nhà phân phối DEF' },
-        { date: '2024-01-16', action: 'Xuất bán', quantity: -180, note: 'Bán lẻ' }
-      ]
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
+  const fetchInventory = async () => {
+    try {
+      setLoading(true);
+      const response = await pharmacyService.getInventory();
+      
+      if (response.success && response.data) {
+        // Transform API data to component format
+        const transformedData = response.data.map(item => ({
+          id: item.id,
+          name: item.name,
+          manufacturer: item.manufacturer,
+          batchNumber: item.batchCode || item.batchNumber,
+          quantity: item.currentStock || item.quantity || 0,
+          originalQuantity: item.maxStock || item.currentStock || 0,
+          unit: 'viên',
+          manufactureDate: item.manufactureDate || item.createdAt,
+          expireDate: item.expiryDate,
+          registrationNumber: item.registrationNumber || 'N/A',
+          status: item.status === 'good' ? 'in_stock' : item.status === 'medium_stock' ? 'low_stock' : 'expired_soon',
+          receivedDate: item.lastUpdated || item.createdAt,
+          distributorName: 'Nhà phân phối',
+          shipmentId: item.transactionHash || 'N/A',
+          location: item.location || 'Kệ chính',
+          price: item.unitPrice || 0,
+          history: [
+            { 
+              date: item.lastUpdated || item.createdAt, 
+              action: 'Nhập kho', 
+              quantity: item.currentStock, 
+              note: 'Nhận hàng từ nhà phân phối' 
+            }
+          ]
+        }));
+        
+        setInventoryData(transformedData);
+      } else {
+        setInventoryData([]);
+      }
+    } catch (err) {
+      console.error('Error fetching inventory:', err);
+      setError('Không thể tải dữ liệu kho hàng');
+      setInventoryData([]);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const getStatusDisplay = (status) => {
     const statusMap = {
@@ -183,6 +124,29 @@ function ManageInventory() {
     setSelectedProduct(null);
     setShowHistory(false);
   };
+
+  if (loading) {
+    return (
+      <div className="manage-inventory">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Đang tải dữ liệu kho hàng...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="manage-inventory">
+        <div className="error-container">
+          <AlertTriangle size={48} />
+          <p>{error}</p>
+          <button className="btn btn-primary" onClick={fetchInventory}>Thử lại</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="manage-inventory">

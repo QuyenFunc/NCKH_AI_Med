@@ -67,21 +67,44 @@ const AccountManagement = () => {
     try {
       setLoading(true);
       
-      // Fetch pharmacy info
-      const mockPharmacyInfo = {
-        name: 'Hiệu thuốc ABC',
-        address: '456 Đường XYZ, Phường 5, Quận 2, TP.HCM',
-        phone: '0987654321',
-        email: 'contact@abc-pharmacy.com',
-        website: 'www.abc-pharmacy.com',
-        licenseNumber: 'GPP-2024-002',
-        licenseIssueDate: '2024-01-15',
-        licenseExpiryDate: '2027-01-14',
-        taxCode: '0123456789',
-        manager: 'Dược sĩ Nguyễn Văn A',
-        establishedYear: '2020',
-        description: 'Hiệu thuốc uy tín phục vụ cộng đồng với đầy đủ các loại thuốc chất lượng cao.'
-      };
+      // Get real pharmacy info from API
+      const pharmaciesResponse = await pharmacyService.getPharmacies();
+      let pharmacyInfo = {};
+      
+      if (pharmaciesResponse.success && pharmaciesResponse.data.length > 0) {
+        // Use first pharmacy as current pharmacy
+        const pharmacy = pharmaciesResponse.data[0];
+        pharmacyInfo = {
+          name: pharmacy.name,
+          address: pharmacy.address,
+          phone: pharmacy.phone || 'N/A',
+          email: pharmacy.email || 'N/A',
+          website: pharmacy.website || 'N/A',
+          licenseNumber: pharmacy.licenseNumber || 'N/A',
+          licenseIssueDate: pharmacy.licenseIssueDate ? pharmacy.licenseIssueDate.split('T')[0] : 'N/A',
+          licenseExpiryDate: pharmacy.licenseExpiryDate ? pharmacy.licenseExpiryDate.split('T')[0] : 'N/A',
+          taxCode: pharmacy.taxCode || 'N/A',
+          manager: pharmacy.manager || 'N/A',
+          establishedYear: pharmacy.establishedYear || 'N/A',
+          description: pharmacy.description || 'N/A'
+        };
+      } else {
+        // Fallback pharmacy info
+        pharmacyInfo = {
+          name: 'Hiệu thuốc ABC',
+          address: '456 Đường XYZ, Phường 5, Quận 2, TP.HCM',
+          phone: '0987654321',
+          email: 'contact@abc-pharmacy.com',
+          website: 'www.abc-pharmacy.com',
+          licenseNumber: 'GPP-2024-002',
+          licenseIssueDate: '2024-01-15',
+          licenseExpiryDate: '2027-01-14',
+          taxCode: '0123456789',
+          manager: 'Dược sĩ Nguyễn Văn A',
+          establishedYear: '2020',
+          description: 'Hiệu thuốc uy tín phục vụ cộng đồng với đầy đủ các loại thuốc chất lượng cao.'
+        };
+      }
 
       // Fetch employees
       const mockEmployees = [
@@ -135,7 +158,7 @@ const AccountManagement = () => {
         }
       ];
 
-      setPharmacyInfo(mockPharmacyInfo);
+      setPharmacyInfo(pharmacyInfo);
       setEmployees(mockEmployees);
     } catch (error) {
       console.error('Error fetching account data:', error);

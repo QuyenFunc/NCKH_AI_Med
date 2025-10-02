@@ -301,6 +301,13 @@
     background: #f8f9fa;
 }
 
+.no-products {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 20px !important;
+}
+
 .product-name {
     font-weight: 500;
     color: #2c3e50;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
   Package, 
@@ -8,83 +8,117 @@ import {
   CheckCircle, 
   Calendar,
   ShoppingCart,
-  Archive
+  Archive,
+  BarChart3
 } from 'lucide-react';
+import pharmacyService from '../../services/apiService';
 import './PharmacyDashboard.css';
 
-// Mock data
-const statsData = [
-  {
-    title: 'Lô hàng đang đến',
-    value: '8',
-    icon: Package,
-    color: 'bg-blue-500',
-    change: '+3 lô hàng trong tuần'
-  },
-  {
-    title: 'Sản phẩm trong kho',
-    value: '2,540',
-    icon: Archive,
-    color: 'bg-green-500',
-    change: '+120 sản phẩm tuần này'
-  },
-  {
-    title: 'Sản phẩm sắp hết hạn',
-    value: '30',
-    icon: AlertTriangle,
-    color: 'bg-yellow-500',
-    change: 'Cần kiểm tra trong 30 ngày'
-  },
-  {
-    title: 'Sản phẩm sắp hết hàng',
-    value: '5',
-    icon: TrendingUp,
-    color: 'bg-red-500',
-    change: 'Cần đặt hàng bổ sung'
-  }
-];
-
-const incomingShipments = [
-  {
-    id: 'LOT001234',
-    distributor: 'Nhà phân phối ABC',
-    expectedDate: '2024-01-18',
-    status: 'Đang vận chuyển',
-    items: 3
-  },
-  {
-    id: 'LOT001235',
-    distributor: 'Nhà phân phối XYZ',
-    expectedDate: '2024-01-19',
-    status: 'Chuẩn bị giao',
-    items: 2
-  },
-  {
-    id: 'LOT001236',
-    distributor: 'Nhà phân phối DEF',
-    expectedDate: '2024-01-20',
-    status: 'Đang vận chuyển',
-    items: 5
-  },
-  {
-    id: 'LOT001237',
-    distributor: 'Nhà phân phối ABC',
-    expectedDate: '2024-01-21',
-    status: 'Chờ xử lý',
-    items: 1
-  }
-];
-
-const topSellingProducts = [
-  { name: 'Paracetamol 500mg', sales: 450 },
-  { name: 'Vitamin C 1000mg', sales: 380 },
-  { name: 'Amoxicillin 250mg', sales: 320 },
-  { name: 'Cetirizine 10mg', sales: 280 },
-  { name: 'Omeprazole 20mg', sales: 240 },
-  { name: 'Aspirin 300mg', sales: 200 }
-];
-
 function PharmacyDashboard() {
+  const [statsData, setStatsData] = useState([]);
+  const [incomingShipments, setIncomingShipments] = useState([]);
+  const [topSellingProducts, setTopSellingProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch real data from APIs
+      const [inventoryResponse, shipmentResponse] = await Promise.all([
+        pharmacyService.getInventory(),
+        pharmacyService.getPendingShipments()
+      ]);
+
+      // Process inventory data for stats
+      const inventory = inventoryResponse.success ? inventoryResponse.data : [];
+      const shipments = shipmentResponse.success ? shipmentResponse.data : [];
+
+      const totalProducts = inventory.reduce((sum, item) => sum + item.currentStock, 0);
+      const expiringProducts = inventory.filter(item => {
+        const expiryDate = new Date(item.expiryDate);
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+        return expiryDate <= thirtyDaysFromNow;
+      }).length;
+      const lowStockProducts = inventory.filter(item => item.currentStock <= item.minStock).length;
+
+      setStatsData([
+        {
+          title: 'Lô hàng đang đến',
+          value: shipments.length.toString(),
+          icon: Package,
+          color: 'bg-blue-500',
+          change: `${shipments.length} lô hàng chờ nhận`
+        },
+        {
+          title: 'Sản phẩm trong kho',
+          value: totalProducts.toLocaleString(),
+          icon: Archive,
+          color: 'bg-green-500',
+          change: `${inventory.length} loại sản phẩm`
+        },
+        {
+          title: 'Sản phẩm sắp hết hạn',
+          value: expiringProducts.toString(),
+          icon: AlertTriangle,
+          color: 'bg-yellow-500',
+          change: 'Cần kiểm tra trong 30 ngày'
+        },
+        {
+          title: 'Sản phẩm sắp hết hàng',
+          value: lowStockProducts.toString(),
+          icon: TrendingUp,
+          color: 'bg-red-500',
+          change: 'Cần đặt hàng bổ sung'
+        }
+      ]);
+
+      setIncomingShipments(shipments.slice(0, 5).map(shipment => ({
+        id: shipment.id || shipment.shipmentId,
+        distributor: shipment.fromAddress || 'Nhà phân phối',
+        expectedDate: shipment.expectedDeliveryDate || shipment.createdAt,
+        status: getStatusText(shipment.status),
+        items: 1 // Assuming each shipment has 1 batch for now
+      })));
+
+      // Use inventory data for top products (by stock quantity)
+      const topProducts = inventory
+        .sort((a, b) => b.currentStock - a.currentStock)
+        .slice(0, 6)
+        .map(item => ({
+          name: item.name,
+          sales: item.currentStock
+        }));
+      
+      setTopSellingProducts(topProducts);
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      // Set empty data on error
+      setStatsData([]);
+      setIncomingShipments([]);
+      setTopSellingProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'in_transit':
+        return 'Đang vận chuyển';
+      case 'pending':
+        return 'Chuẩn bị giao';
+      default:
+        return 'Chờ xử lý';
+    }
+  };
+
   const getShipmentStatusClass = (status) => {
     switch (status) {
       case 'Đang vận chuyển':
@@ -98,155 +132,115 @@ function PharmacyDashboard() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="pharmacy-dashboard">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Đang tải thông tin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pharmacy-dashboard">
-      <div className="dashboard-header">
-        <h1>Dashboard Hiệu Thuốc</h1>
-        <p>Tổng quan quản lý kho và nhận hàng</p>
+      <div className="page-header">
+        <h1>Dashboard - Hiệu thuốc</h1>
+        <p>Tổng quan hoạt động nhận hàng và quản lý tồn kho</p>
       </div>
 
       {/* Stats Cards */}
       <div className="stats-grid">
         {statsData.map((stat, index) => {
-          const Icon = stat.icon;
+          const IconComponent = stat.icon;
           return (
             <div key={index} className="stat-card">
-              <div className="stat-icon-wrapper">
-                <Icon className="stat-icon" />
-              </div>
               <div className="stat-content">
-                <h3 className="stat-value">{stat.value}</h3>
-                <p className="stat-title">{stat.title}</p>
-                <p className="stat-change">{stat.change}</p>
+                <div className="stat-header">
+                  <h3>{stat.title}</h3>
+                  <div className={`stat-icon ${stat.color}`}>
+                    <IconComponent size={24} />
+                  </div>
+                </div>
+                <div className="stat-value">{stat.value}</div>
+                <div className="stat-change">{stat.change}</div>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Main Content Grid */}
-      <div className="dashboard-grid">
+      <div className="dashboard-content">
         {/* Incoming Shipments */}
-        <div className="dashboard-card">
-          <div className="card-header">
-            <h2>Lô hàng đang chờ nhận</h2>
-            <span className="badge">{incomingShipments.length}</span>
+        <div className="dashboard-section">
+          <div className="section-header">
+            <h2>
+              <Package size={20} />
+              Lô hàng sắp đến
+            </h2>
           </div>
           <div className="shipments-list">
-            {incomingShipments.map((shipment) => (
-              <div key={shipment.id} className="shipment-item">
-                <div className="shipment-info">
-                  <div className="shipment-main">
-                    <span className="shipment-id">{shipment.id}</span>
-                    <span className="distributor-name">{shipment.distributor}</span>
+            {incomingShipments.length === 0 ? (
+              <div className="no-data">
+                <Package size={48} />
+                <p>Không có lô hàng nào đang đến</p>
+              </div>
+            ) : (
+              incomingShipments.map((shipment) => (
+                <div key={shipment.id} className="shipment-item">
+                  <div className="shipment-info">
+                    <h4>#{shipment.id}</h4>
+                    <p>{shipment.distributor}</p>
+                    <small>{shipment.items} sản phẩm</small>
                   </div>
-                  <div className="shipment-meta">
-                    <div className="shipment-date">
-                      <Calendar className="meta-icon" />
-                      <span>{new Date(shipment.expectedDate).toLocaleDateString('vi-VN')}</span>
-                    </div>
-                    <div className="shipment-items">
-                      <Package className="meta-icon" />
-                      <span>{shipment.items} sản phẩm</span>
-                    </div>
-                  </div>
-                  <div className="shipment-status">
-                    <span className={`status-badge ${getShipmentStatusClass(shipment.status)}`}>
+                  <div className="shipment-details">
+                    <span className={`status ${getShipmentStatusClass(shipment.status)}`}>
                       {shipment.status}
                     </span>
+                    <div className="expected-date">
+                      <Calendar size={14} />
+                      <span>{new Date(shipment.expectedDate).toLocaleDateString('vi-VN')}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-          <div className="card-footer">
-            <button className="btn btn-primary btn-full">
-              <ShoppingCart />
-              Đi đến nhận hàng
-            </button>
+              ))
+            )}
           </div>
         </div>
 
         {/* Top Selling Products Chart */}
-        <div className="dashboard-card chart-card">
-          <div className="card-header">
-            <h2>Sản phẩm bán chạy nhất (tháng này)</h2>
+        <div className="dashboard-section">
+          <div className="section-header">
+            <h2>
+              <ShoppingCart size={20} />
+              Sản phẩm hàng đầu (theo tồn kho)
+            </h2>
           </div>
           <div className="chart-container">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={topSellingProducts}
-                margin={{
-                  top: 20,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
-                  tick={{ fontSize: 12 }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="sales" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {topSellingProducts.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={topSellingProducts}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fontSize: 12 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="sales" fill="#3498db" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="no-data">
+                <BarChart3 size={48} />
+                <p>Không có dữ liệu để hiển thị</p>
+              </div>
+            )}
           </div>
-        </div>
-      </div>
-
-      {/* Alerts Section */}
-      <div className="alerts-section">
-        <h2>Cảnh báo và Thông báo</h2>
-        <div className="alerts-grid">
-          <div className="alert-card warning">
-            <AlertTriangle className="alert-icon" />
-            <div className="alert-content">
-              <h3>Sản phẩm sắp hết hạn</h3>
-              <p>30 sản phẩm sẽ hết hạn trong 30 ngày tới</p>
-              <button className="btn btn-secondary btn-small">Xem chi tiết</button>
-            </div>
-          </div>
-          <div className="alert-card danger">
-            <TrendingUp className="alert-icon" />
-            <div className="alert-content">
-              <h3>Sản phẩm sắp hết hàng</h3>
-              <p>5 sản phẩm có lượng tồn kho dưới mức tối thiểu</p>
-              <button className="btn btn-secondary btn-small">Đặt hàng ngay</button>
-            </div>
-          </div>
-          <div className="alert-card success">
-            <CheckCircle className="alert-icon" />
-            <div className="alert-content">
-              <h3>Nhận hàng thành công</h3>
-              <p>3 lô hàng đã được nhận và xác thực hôm nay</p>
-              <button className="btn btn-secondary btn-small">Xem lịch sử</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="quick-actions">
-        <h2>Thao tác Nhanh</h2>
-        <div className="action-buttons">
-          <button className="action-btn primary">
-            <ShoppingCart />
-            Nhận hàng mới
-          </button>
-          <button className="action-btn secondary">
-            <Archive />
-            Xem kho hàng
-          </button>
-          <button className="action-btn secondary">
-            <Clock />
-            Lịch sử giao dịch
-          </button>
         </div>
       </div>
     </div>
@@ -254,6 +248,3 @@ function PharmacyDashboard() {
 }
 
 export default PharmacyDashboard;
-
-
-

@@ -80,4 +80,9 @@ public class DrugBatchDto {
 
     private List<ShipmentDto> shipments;
     private List<BlockchainTransactionDto> transactions;
+
+    // Helper method for backward compatibility
+    public String getMintTransactionHash() {
+        return transactionHash;
+    }
 }

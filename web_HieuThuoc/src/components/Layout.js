@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
   Package, 
@@ -12,13 +12,18 @@ import {
   User,
   Settings,
   Heart,
-  Users
+  Users,
+  LogOut
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import './Layout.css';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const navigationItems = [
     {
@@ -55,6 +60,11 @@ const Layout = ({ children }) => {
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   return (
@@ -99,7 +109,7 @@ const Layout = ({ children }) => {
               <Heart size={24} />
             </div>
             <div className="company-details">
-              <div className="company-name">Hiệu thuốc ABC</div>
+              <div className="company-name">{user?.name || 'Hiệu thuốc ABC'}</div>
               <div className="company-role">Hiệu thuốc</div>
             </div>
           </div>
@@ -129,15 +139,29 @@ const Layout = ({ children }) => {
             </button>
             
             <div className="user-menu">
-              <button className="user-btn">
+              <button className="user-btn" onClick={() => setUserMenuOpen(!userMenuOpen)}>
                 <User size={20} />
-                <span>Dược sĩ</span>
+                <span>{user?.name || 'Dược sĩ'}</span>
               </button>
+              
+              {userMenuOpen && (
+                <div className="user-dropdown">
+                  <div className="user-info">
+                    <p className="user-name">{user?.name}</p>
+                    <p className="user-email">{user?.email}</p>
+                  </div>
+                  <div className="dropdown-divider"></div>
+                  <button className="dropdown-item" onClick={() => navigate('/account')}>
+                    <Settings size={16} />
+                    <span>Cài đặt</span>
+                  </button>
+                  <button className="dropdown-item logout-btn" onClick={handleLogout}>
+                    <LogOut size={16} />
+                    <span>Đăng xuất</span>
+                  </button>
+                </div>
+              )}
             </div>
-
-            <button className="header-btn">
-              <Settings size={20} />
-            </button>
           </div>
         </header>
 

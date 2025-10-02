@@ -105,14 +105,23 @@ environment:
 - Kiểm tra Hardhat node đang chạy: `curl http://localhost:8545`
 - Kiểm tra network settings trong docker-compose.yml
 
-### 2. Database connection error
+### 2. Log spam "Index had to catch up" liên tục
+**Đã fix**: Indexer đã được disable (`DISABLE_INDEXER: "true"`) để tránh loop vô hạn khi không có blocks mới.
+- Blockscout vẫn có thể xem transactions và blocks
+- API vẫn hoạt động bình thường
+- Để bật lại indexer (khi cần index historical blocks):
+  ```yaml
+  DISABLE_INDEXER: "false"
+  ```
+
+### 3. Database connection error
 ```bash
 # Reset database
 docker-compose down -v
 docker-compose up -d
 ```
 
-### 3. Services không start
+### 4. Services không start
 ```bash
 # Xem logs
 docker-compose logs [service_name]
@@ -121,7 +130,7 @@ docker-compose logs [service_name]
 docker-compose restart [service_name]
 ```
 
-### 4. Memory issues
+### 5. Memory issues
 Tăng memory limit cho Docker Desktop (ít nhất 4GB)
 
 ## Dừng services
@@ -158,3 +167,5 @@ const transactions = await response.json();
 - Đây là môi trường development, không dùng cho production
 - Data sẽ bị mất khi restart containers (trừ khi dùng volumes)
 - Để production, cần cấu hình SSL, security, và external database
+- **Indexer đã được disable** để tránh log spam khi chưa có blocks. Blockscout vẫn có thể xem data mới khi có transactions thực tế
+- Khi deploy contract và có transactions, data sẽ tự động xuất hiện trên Blockscout ngay lập tức qua API

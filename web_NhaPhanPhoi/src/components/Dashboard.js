@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import distributorService from '../services/apiService';
+import VerificationBanner from './VerificationBanner';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -106,6 +107,9 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard">
+      {/* Verification Banner */}
+      <VerificationBanner />
+      
       {/* Welcome Section */}
       <div className="welcome-section">
         <h2>Chào mừng trở lại! 👋</h2>
@@ -132,7 +136,7 @@ const Dashboard = () => {
         />
         <StatCard
           title="Tồn kho (sản phẩm)"
-          value={stats.totalInventory.toLocaleString()}
+          value={stats.totalInventory?.toLocaleString() || 0}
           icon={CheckCircle}
           color="green"
           change={15}

@@ -34,67 +34,45 @@ const Dashboard = () => {
       try {
         setLoading(true);
         
-        // Mock data for manufacturer dashboard
-        setStats({
-          totalProducts: 25,
-          activeBatches: 45,
-          shippedBatches: 128,
-          totalDistributors: 15
-        });
+        // Fetch real data from API
+        const response = await manufacturerService.getDashboardData();
+        
+        if (response.success && response.data) {
+          setStats(response.data.stats || {
+            totalProducts: 0,
+            activeBatches: 0,
+            shippedBatches: 0,
+            totalDistributors: 0
+          });
 
-        // Mock recent activities
-        setRecentActivities([
-          {
-            id: 1,
-            type: 'batch_created',
-            message: 'Tạo lô thuốc mới BT2024045 - Paracetamol 500mg',
-            timestamp: new Date(Date.now() - 30 * 60 * 1000),
-            icon: Package
-          },
-          {
-            id: 2,
-            type: 'shipment_sent',
-            message: 'Gửi lô hàng SH001 đến Nhà phân phối ABC',
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-            icon: Truck
-          },
-          {
-            id: 3,
-            type: 'product_added',
-            message: 'Thêm sản phẩm mới: Vitamin D3 1000IU',
-            timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-            icon: Factory
-          },
-          {
-            id: 4,
-            type: 'batch_completed',
-            message: 'Hoàn thành sản xuất lô BT2024044',
-            timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
-            icon: CheckCircle
-          }
-        ]);
-
-        // Mock chart data for production over time
-        setChartData([
-          { month: 'T7', production: 120, shipped: 115 },
-          { month: 'T8', production: 135, shipped: 128 },
-          { month: 'T9', production: 142, shipped: 138 },
-          { month: 'T10', production: 158, shipped: 145 },
-          { month: 'T11', production: 165, shipped: 162 },
-          { month: 'T12', production: 175, shipped: 168 }
-        ]);
-
-        // Mock production distribution data
-        setProductionData([
-          { name: 'Giảm đau hạ sốt', value: 35, color: '#3498db' },
-          { name: 'Kháng sinh', value: 25, color: '#27ae60' },
-          { name: 'Vitamin & Khoáng chất', value: 20, color: '#f39c12' },
-          { name: 'Thuốc tim mạch', value: 15, color: '#e74c3c' },
-          { name: 'Khác', value: 5, color: '#95a5a6' }
-        ]);
+          setRecentActivities(response.data.recentActivities || []);
+          setChartData(response.data.chartData || []);
+          setProductionData(response.data.productionData || []);
+        } else {
+          // Set empty states if no data
+          setStats({
+            totalProducts: 0,
+            activeBatches: 0,
+            shippedBatches: 0,
+            totalDistributors: 0
+          });
+          setRecentActivities([]);
+          setChartData([]);
+          setProductionData([]);
+        }
 
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
+        // Set empty states on error
+        setStats({
+          totalProducts: 0,
+          activeBatches: 0,
+          shippedBatches: 0,
+          totalDistributors: 0
+        });
+        setRecentActivities([]);
+        setChartData([]);
+        setProductionData([]);
       } finally {
         setLoading(false);
       }

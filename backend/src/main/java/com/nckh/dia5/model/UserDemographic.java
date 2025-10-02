@@ -1,5 +1,6 @@
 package com.nckh.dia5.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -19,6 +20,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class UserDemographic {
 
     @Id
@@ -27,6 +29,7 @@ public class UserDemographic {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User user;
 
     @NotNull
@@ -53,6 +56,7 @@ public class UserDemographic {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "province_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Province province;
 
     @Size(max = 100)

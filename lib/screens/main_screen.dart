@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'chat_screen.dart';
 import 'news_screen.dart';
+import 'qr_scanner_screen.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const ChatScreen(),
     const NewsScreen(),
+    const QRScannerScreen(),
     const ProfileScreen(),
   ];
 
@@ -62,10 +64,16 @@ class _MainScreenState extends State<MainScreen> {
                   index: 1,
                 ),
                 _buildNavItem(
+                  icon: Icons.qr_code_scanner_outlined,
+                  activeIcon: Icons.qr_code_scanner,
+                  label: 'Quét QR',
+                  index: 2,
+                ),
+                _buildNavItem(
                   icon: Icons.person_outline,
                   activeIcon: Icons.person,
                   label: 'Hồ sơ',
-                  index: 2,
+                  index: 3,
                 ),
               ],
             ),

@@ -1,7 +1,6 @@
 package com.nckh.dia5.service;
 
 import com.nckh.dia5.dto.blockchain.DrugBatch;
-import com.nckh.dia5.dto.blockchain.DrugShipment;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -20,7 +19,6 @@ import org.web3j.protocol.core.methods.response.EthSendTransaction;
 import org.web3j.tx.gas.StaticGasProvider;
 
 import java.math.BigInteger;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;

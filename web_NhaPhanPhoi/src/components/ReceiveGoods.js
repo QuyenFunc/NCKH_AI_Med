@@ -11,45 +11,57 @@ const ReceiveGoods = () => {
     const [success, setSuccess] = useState(null);
     const [pendingShipments, setPendingShipments] = useState([]);
 
+    // Helper function to normalize shipment data
+    const normalizeShipmentData = (shipment) => {
+        if (!shipment) return null;
+        
+        return {
+            ...shipment,
+            products: shipment.products || [
+                {
+                    name: shipment.drugName || 'Sản phẩm',
+                    quantity: shipment.quantity || 0,
+                    batchCode: shipment.batchNumber || shipment.id,
+                    manufacturer: shipment.manufacturerName || 'N/A'
+                }
+            ]
+        };
+    };
+
     useEffect(() => {
         fetchPendingShipments();
     }, []);
 
     const fetchPendingShipments = async () => {
         try {
-            // Mock data - replace with actual API call
-            const mockPendingShipments = [
-                {
-                    id: 'SHIP001',
-                    from: 'Công ty Dược phẩm ABC',
-                    trackingCode: 'TRK123456789',
-                    expectedDate: '2024-09-20',
-                    products: [
-                        { name: 'Paracetamol 500mg', quantity: 5000, batchCode: 'BT2024001' },
-                        { name: 'Amoxicillin 250mg', quantity: 3000, batchCode: 'BT2024002' }
-                    ],
-                    totalValue: 450000000
-                },
-                {
-                    id: 'SHIP002', 
-                    from: 'Nhà sản xuất DEF',
-                    trackingCode: 'TRK987654321',
-                    expectedDate: '2024-09-21',
-                    products: [
-                        { name: 'Vitamin C 1000mg', quantity: 2000, batchCode: 'BT2024003' }
-                    ],
-                    totalValue: 120000000
-                }
-            ];
-            setPendingShipments(mockPendingShipments);
+            setLoading(true);
+            // Use recipient address (distributor wallet) to get inbound shipments
+            const recipientAddress = localStorage.getItem('walletAddress');
+            const response = await distributorService.getInboundShipments(recipientAddress);
+            
+            if (response.success && response.data) {
+                // Filter out invalid shipments and normalize
+                const validShipments = response.data.filter(shipment => 
+                    shipment.shipmentId && shipment.shipmentId > 0
+                );
+                const normalizedShipments = validShipments.map(shipment => normalizeShipmentData(shipment));
+                setPendingShipments(normalizedShipments);
+            } else {
+                console.error('Failed to fetch pending shipments:', response.message);
+                setPendingShipments([]);
+            }
         } catch (err) {
             console.error('Error fetching pending shipments:', err);
+            setError('Không thể tải danh sách shipment đang chờ. Vui lòng thử lại.');
+            setPendingShipments([]);
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleScan = async () => {
         if (!scanInput.trim()) {
-            setError('Vui lòng nhập mã vận đơn hoặc mã lô');
+            setError('Vui lòng nhập mã shipment (SHIP-xxxxxxxxxx hoặc số shipment ID)');
             return;
         }
 
@@ -57,38 +69,144 @@ const ReceiveGoods = () => {
             setLoading(true);
             setError(null);
             
-            // Mock API call - replace with actual implementation
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            // Find matching shipment from pending list
+            // Step 1: Check if input is a shipment ID in pending list
             const foundShipment = pendingShipments.find(
-                shipment => shipment.trackingCode === scanInput || shipment.id === scanInput
+                shipment => shipment.trackingCode === scanInput || 
+                           shipment.id === scanInput ||
+                           shipment.shipmentId === scanInput ||
+                           `SHIP-${shipment.shipmentId}` === scanInput ||
+                           shipment.shipmentId?.toString() === scanInput
             );
 
             if (foundShipment) {
-                setShipmentDetails(foundShipment);
-            } else {
-                // Mock successful scan with sample data
-                const mockShipmentDetails = {
-                    id: scanInput,
-                    from: 'Công ty Dược phẩm ABC',
-                    trackingCode: scanInput,
-                    expectedDate: '2024-09-20',
-                    products: [
-                        { 
-                            name: 'Paracetamol 500mg', 
-                            quantity: 1000, 
-                            batchCode: 'BT2024' + scanInput.slice(-3),
-                            expiry: '2026-12-31',
-                            manufacturer: 'Công ty Dược phẩm ABC'
+                // Step 2: Verify blockchain ownership before showing details
+                const recipientAddress = localStorage.getItem('walletAddress');
+                
+                // Check if this shipment's NFT ownership was transferred to us
+                try {
+                    const verification = await distributorService.verifyShipmentOwnership(
+                        foundShipment.id || foundShipment.shipmentId,
+                        recipientAddress
+                    );
+                    
+                    if (verification.success && verification.data.isOwner) {
+                        setShipmentDetails(normalizeShipmentData(foundShipment));
+                        return;
+                    } else {
+                        setError('Lô hàng này chưa được chuyển quyền sở hữu trên blockchain. Có thể là hàng giả!');
+                        return;
+                    }
+                } catch (e) {
+                    console.error('Error verifying blockchain ownership:', e);
+                    // Continue with normal flow if verification fails
+                    setShipmentDetails(normalizeShipmentData(foundShipment));
+                    return;
+                }
+            }
+
+            // Step 2: Try to fetch shipment by ID directly from API
+            try {
+                const byId = await distributorService.getShipmentById(scanInput);
+                if (byId.success && byId.data) {
+                    // Verify this shipment belongs to us
+                    const recipientAddress = localStorage.getItem('walletAddress');
+                    if (byId.data.toAddress?.toLowerCase() === recipientAddress?.toLowerCase()) {
+                        // Get batch information for display
+                        let batchInfo = null;
+                        if (byId.data.batchId) {
+                            try {
+                                const batchRes = await distributorService.getBatchDetails(byId.data.batchId);
+                                if (batchRes.success && batchRes.data) {
+                                    batchInfo = batchRes.data;
+                                }
+                            } catch (e) {
+                                console.warn('Could not fetch batch details:', e);
+                            }
                         }
-                    ],
-                    totalValue: 95000000,
-                    driverName: 'Nguyễn Văn A',
-                    vehicleNumber: '29A-123456',
-                    notes: 'Hàng cần bảo quản nơi khô ráo, thoáng mát'
-                };
-                setShipmentDetails(mockShipmentDetails);
+                        
+                        // Create normalized shipment data with batch info
+                        const normalized = {
+                            id: byId.data.id,
+                            shipmentId: byId.data.shipmentId, // Ensure shipmentId is preserved
+                            trackingCode: byId.data.shipmentCode || `SHIP-${byId.data.shipmentId}`,
+                            from: byId.data.fromAddress,
+                            to: byId.data.toAddress,
+                            status: byId.data.status,
+                            quantity: byId.data.quantity,
+                            shipmentTimestamp: byId.data.shipmentTimestamp,
+                            trackingInfo: byId.data.trackingInfo,
+                            expectedDate: byId.data.expectedDeliveryDate || byId.data.shipmentTimestamp,
+                            totalValue: 0, // Will be calculated from products
+                            products: [
+                                {
+                                    name: batchInfo?.drugName || 'Sản phẩm dược phẩm',
+                                    quantity: byId.data.quantity || 0,
+                                    batchCode: batchInfo?.batchNumber || 'N/A',
+                                    manufacturer: batchInfo?.manufacturer || 'N/A',
+                                    expiryDate: batchInfo?.expiryDate || 'N/A'
+                                }
+                            ]
+                        };
+                        setShipmentDetails(normalized);
+                        return;
+                    } else {
+                        setError('Lô hàng này không được gửi đến địa chỉ của bạn');
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.log('Shipment not found by ID, trying other methods...');
+            }
+
+            // Fallback: user scanned batch code -> find pending shipments by batch (by code or internal id)
+            try {
+                let shipmentsRes = await distributorService.getShipmentsByBatch(scanInput);
+                let shipments = Array.isArray(shipmentsRes?.data) ? shipmentsRes.data : [];
+
+                // If backend rejected because scanInput is batchNumber, resolve batchId first
+                if (!shipments.length) {
+                    const allBatches = await distributorService.getBatches();
+                    const foundBatch = (allBatches?.data || []).find(b => 
+                        b.batchNumber === scanInput || b.id?.toString?.() === scanInput || b.batchId?.toString?.() === scanInput
+                    );
+                    if (foundBatch) {
+                        const batchId = foundBatch.batchId?.toString?.() || foundBatch.id?.toString?.() || foundBatch.batchNumber;
+                        shipmentsRes = await distributorService.getShipmentsByBatch(batchId);
+                        shipments = Array.isArray(shipmentsRes?.data) ? shipmentsRes.data : [];
+                    }
+                }
+
+                if (shipments.length) {
+                    const recipientAddress = localStorage.getItem('walletAddress')?.toLowerCase?.();
+                    const pendingForMe = shipments.find(s => 
+                        (s.status?.toLowerCase?.() === 'pending' || s.status?.toLowerCase?.() === 'in_transit') &&
+                        (s.recipientAddress?.toLowerCase?.() === recipientAddress || s.toAddress?.toLowerCase?.() === recipientAddress)
+                    );
+                    if (pendingForMe) {
+                        // Normalize minimal fields for UI
+                        const normalized = {
+                            id: pendingForMe.id || pendingForMe.shipmentId,
+                            shipmentId: pendingForMe.shipmentId, // Ensure shipmentId is available
+                            trackingCode: pendingForMe.shipmentCode || pendingForMe.trackingCode || `SHIP-${pendingForMe.shipmentId}` || pendingForMe.id,
+                            from: pendingForMe.senderName || pendingForMe.from || 'Nhà sản xuất',
+                            expectedDate: pendingForMe.estimatedDelivery || pendingForMe.createdAt,
+                            totalValue: pendingForMe.totalValue || 0,
+                            products: [
+                                {
+                                    name: pendingForMe.drugName || 'Sản phẩm',
+                                    quantity: pendingForMe.quantity || 0,
+                                    batchCode: pendingForMe.batchNumber || scanInput
+                                }
+                            ]
+                        };
+                        setShipmentDetails(normalized);
+                        return;
+                    }
+                }
+                setError(`Không tìm thấy shipment với mã: ${scanInput}. Vui lòng kiểm tra lại mã shipment (định dạng: SHIP-xxxxxxxxxx hoặc số shipment ID).`);
+            } catch (err) {
+                console.warn('Could not find shipments by batch:', err);
+                setError(`Không tìm thấy shipment với mã: ${scanInput}. Vui lòng kiểm tra lại mã shipment.`);
             }
         } catch (err) {
             setError('Không thể tìm thấy thông tin lô hàng: ' + err.message);
@@ -104,17 +222,36 @@ const ReceiveGoods = () => {
             setLoading(true);
             setError(null);
 
-            // Call blockchain API to confirm receipt
-            const response = await distributorService.confirmReceiveGoods({
-                shipmentId: shipmentDetails.id,
-                trackingCode: shipmentDetails.trackingCode,
-                products: shipmentDetails.products,
-                confirmedBy: 'Distributor User', // Get from auth context
-                confirmationDate: new Date().toISOString()
-            });
+            // Confirm receipt via API - try multiple ID strategies
+            let shipmentIdForApi = null;
+            
+            // Strategy 1: Use database ID if available (most reliable)
+            if (shipmentDetails.id) {
+                shipmentIdForApi = shipmentDetails.id.toString();
+                console.log('Using database ID for API call:', shipmentIdForApi);
+            }
+            // Strategy 2: Use shipmentId from blockchain
+            else if (shipmentDetails.shipmentId) {
+                shipmentIdForApi = shipmentDetails.shipmentId.toString();
+                console.log('Using blockchain shipmentId for API call:', shipmentIdForApi);
+            }
+            // Strategy 3: Extract from tracking code
+            else if (shipmentDetails.trackingCode?.startsWith('SHIP-')) {
+                shipmentIdForApi = shipmentDetails.trackingCode.slice(5);
+                console.log('Using tracking code ID for API call:', shipmentIdForApi);
+            }
+            
+            if (!shipmentIdForApi) {
+                setError('Không xác định được shipment ID để nhận hàng');
+                console.error('shipmentDetails:', shipmentDetails);
+                return;
+            }
+            
+            console.log('Receiving shipment with shipmentId:', shipmentIdForApi);
+            const response = await distributorService.receiveShipment(shipmentIdForApi);
 
             if (response.success) {
-                setSuccess(`Đã xác nhận nhận hàng thành công! Giao dịch blockchain: ${response.data.transactionHash}`);
+                setSuccess(`Đã xác nhận nhận hàng thành công! Giao dịch blockchain: ${response.data?.data?.transactionHash || response.data?.transactionHash || ''}`);
                 
                 // Reset form
                 setScanInput('');
@@ -140,8 +277,19 @@ const ReceiveGoods = () => {
     };
 
     const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('vi-VN');
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('vi-VN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+        } catch (error) {
+            return dateString;
+        }
     };
+
 
     return (
         <div className="receive-goods">
@@ -173,7 +321,7 @@ const ReceiveGoods = () => {
                     <div className="scanner-header">
                         <QrCode size={32} />
                         <h3>Quét mã nhận hàng</h3>
-                        <p>Quét mã vận đơn hoặc mã lô từ phiếu giao hàng</p>
+                        <p>Quét mã shipment từ phiếu giao hàng hoặc nhập trực tiếp mã SHIP-xxxxxxxxxx</p>
                     </div>
 
                     <div className="scanner-input">
@@ -183,7 +331,7 @@ const ReceiveGoods = () => {
                                 type="text"
                                 value={scanInput}
                                 onChange={(e) => setScanInput(e.target.value)}
-                                placeholder="Nhập hoặc quét mã vận đơn (VD: TRK123456789)"
+                                placeholder="Nhập mã shipment (VD: SHIP-17591528224436381 hoặc 17591528224436381)"
                                 className="scan-input"
                                 onKeyPress={(e) => e.key === 'Enter' && handleScan()}
                             />
@@ -260,15 +408,22 @@ const ReceiveGoods = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {shipmentDetails.products.map((product, index) => (
+                                            {(shipmentDetails.products || []).map((product, index) => (
                                                 <tr key={index}>
                                                     <td className="product-name">{product.name}</td>
                                                     <td className="batch-code">{product.batchCode}</td>
-                                                    <td className="quantity">{product.quantity.toLocaleString()} viên</td>
+                                                    <td className="quantity">{product.quantity?.toLocaleString() || 0} viên</td>
                                                     <td className="expiry">{product.expiry || 'N/A'}</td>
                                                     <td className="manufacturer">{product.manufacturer || shipmentDetails.from}</td>
                                                 </tr>
                                             ))}
+                                            {(!shipmentDetails.products || shipmentDetails.products.length === 0) && (
+                                                <tr>
+                                                    <td colSpan="5" className="no-products">
+                                                        Không có thông tin sản phẩm chi tiết
+                                                    </td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -320,7 +475,12 @@ const ReceiveGoods = () => {
                 </div>
 
                 <div className="pending-grid">
-                    {pendingShipments.length === 0 ? (
+                    {loading && pendingShipments.length === 0 ? (
+                        <div className="loading-pending">
+                            <div className="loading-spinner"></div>
+                            <p>Đang tải danh sách lô hàng đang chờ...</p>
+                        </div>
+                    ) : pendingShipments.length === 0 ? (
                         <div className="no-pending">
                             <Package size={48} className="no-data-icon" />
                             <h4>Không có lô hàng nào đang chờ</h4>
@@ -341,7 +501,7 @@ const ReceiveGoods = () => {
                                         Dự kiến: {formatDate(shipment.expectedDate)}
                                     </div>
                                     <div className="products-count">
-                                        {shipment.products.length} sản phẩm
+                                        {(shipment.products || []).length} sản phẩm
                                     </div>
                                     <div className="total-value">
                                         {formatCurrency(shipment.totalValue)}

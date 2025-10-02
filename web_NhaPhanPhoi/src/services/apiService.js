@@ -12,16 +12,19 @@ const apiClient = axios.create({
   },
 });
 
-// Request interceptor for auth
+// Add request interceptor to include auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    // Add auth token if available
+    const token = localStorage.getItem('distributor_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor for error handling
@@ -30,9 +33,15 @@ apiClient.interceptors.response.use(
   (error) => {
     console.error('API Error:', error);
     
+    // Handle 401 Unauthorized
     if (error.response?.status === 401) {
-      localStorage.removeItem('authToken');
-      window.location.href = '/login';
+      localStorage.removeItem('distributor_token');
+      localStorage.removeItem('distributor_user');
+      localStorage.removeItem('walletAddress');
+      // Redirect to login if needed
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     
     const errorMessage = error.response?.data?.message || 
@@ -67,10 +76,10 @@ export const blockchainAPI = {
   
   // Distributor: create shipment -> POST /api/blockchain/drugs/shipments
   createShipment: (shipmentData) => apiClient.post('/blockchain/drugs/shipments', {
-    batchId: shipmentData.batchId,
+    batchId: shipmentData.batchId.toString(), // Ensure string for BigInteger
     toAddress: shipmentData.pharmacyAddress,
     quantity: Number(shipmentData.quantity),
-    trackingInfo: shipmentData.trackingNumber
+    trackingInfo: shipmentData.trackingInfo || shipmentData.trackingNumber
   }),
   
   // Pharmacy: receive shipment -> POST /api/blockchain/drugs/shipments/{id}/receive
@@ -81,153 +90,22 @@ export const blockchainAPI = {
   
   // Batch details -> GET /api/blockchain/drugs/batches/{batchId}
   getBatchDetails: (batchId) => apiClient.get(`/blockchain/drugs/batches/${batchId}`),
+  // Shipments by batch -> GET /api/blockchain/drugs/batches/{batchId}/shipments
+  getShipmentsByBatch: (batchId) => apiClient.get(`/blockchain/drugs/batches/${batchId}/shipments`),
   
-  // All batches (if implemented later)
+  // All batches
   getAllBatches: () => apiClient.get('/blockchain/drugs/batches'),
+  // Batches by current owner -> GET /api/blockchain/drugs/batches/owner/{ownerAddress}
+  getBatchesByOwner: (ownerAddress) => apiClient.get(`/blockchain/drugs/batches/owner/${ownerAddress}`),
   
-  // Shipments list (if implemented later)
+  // Shipments list
   getShipments: (params = {}) => apiClient.get('/blockchain/drugs/shipments', { params }),
   
-  // Shipment by ID (if implemented later)
-  getShipmentById: (shipmentId) => apiClient.get(`/blockchain/drugs/shipments/${shipmentId}`)
-};
+  // Shipment by ID
+  getShipmentById: (shipmentId) => apiClient.get(`/blockchain/drugs/shipments/${shipmentId}`),
 
-// Mock data service (for development)
-export const mockDataService = {
-  getBatches: () => {
-    return Promise.resolve({
-      success: true,
-      data: [
-        {
-          id: 'BT001234',
-          drugName: 'Paracetamol 500mg',
-          manufacturer: 'ABC Pharma Ltd',
-          quantity: 1000,
-          availableQuantity: 750,
-          manufactureDate: '2024-01-15',
-          expiryDate: '2026-01-15',
-          status: 'available',
-          qrCode: 'QR_BT001234',
-          location: 'Kho A - Kệ 1B',
-          registrationNumber: 'VD-123456-24',
-          activeIngredient: 'Acetaminophen',
-          transactionHash: '0x1234567890abcdef'
-        },
-        {
-          id: 'BT001235',
-          drugName: 'Amoxicillin 250mg',
-          manufacturer: 'XYZ Healthcare',
-          quantity: 500,
-          availableQuantity: 0,
-          manufactureDate: '2024-02-01',
-          expiryDate: '2025-02-01',
-          status: 'out_of_stock',
-          qrCode: 'QR_BT001235',
-          location: 'Kho B - Kệ 2A',
-          registrationNumber: 'VD-789012-24',
-          activeIngredient: 'Amoxicillin trihydrate',
-          transactionHash: '0x2345678901bcdefg'
-        }
-      ]
-    });
-  },
-
-  getPharmacies: () => {
-    return Promise.resolve({
-      success: true,
-      data: [
-        {
-          id: 'PH001',
-          name: 'Hiệu thuốc Sài Gòn',
-          address: '123 Nguyễn Văn Cừ, Q1, TP.HCM',
-          contactPerson: 'Nguyễn Văn A',
-          phone: '0901234567',
-          email: 'contact@pharmasaigon.com',
-          walletAddress: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
-        },
-        {
-          id: 'PH002',
-          name: 'Hiệu thuốc Hà Nội',
-          address: '456 Phố Huế, Hai Bà Trưng, Hà Nội',
-          contactPerson: 'Trần Thị B',
-          phone: '0907654321',
-          email: 'info@pharmahanoi.com',
-          walletAddress: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
-        }
-      ]
-    });
-  },
-
-  getShipments: () => {
-    return Promise.resolve({
-      success: true,
-      data: [
-        {
-          id: 'SH001234',
-          batchId: 'BT001234',
-          drugName: 'Paracetamol 500mg',
-          pharmacyName: 'Hiệu thuốc Sài Gòn',
-          quantity: 250,
-          status: 'in_transit',
-          trackingNumber: 'SH123456ABC',
-          createdDate: '2024-09-15',
-          estimatedDelivery: '2024-09-18',
-          priority: 'normal',
-          transactionHash: '0x3456789012cdefgh'
-        },
-        {
-          id: 'SH001235',
-          batchId: 'BT001237',
-          drugName: 'Ibuprofen 400mg',
-          pharmacyName: 'Hiệu thuốc Hà Nội',
-          quantity: 150,
-          status: 'delivered',
-          trackingNumber: 'SH789012DEF',
-          createdDate: '2024-09-10',
-          estimatedDelivery: '2024-09-13',
-          deliveredDate: '2024-09-13',
-          priority: 'high',
-          transactionHash: '0x4567890123defghi'
-        }
-      ]
-    });
-  },
-
-  getDashboardStats: () => {
-    return Promise.resolve({
-      success: true,
-      data: {
-        totalBatches: 156,
-        activeShipments: 23,
-        completedShipments: 342,
-        pendingShipments: 7,
-        recentActivities: [
-          {
-            id: 1,
-            type: 'shipment_created',
-            message: 'Tạo shipment mới #SH001234 đến Hiệu thuốc ABC',
-            timestamp: '2 phút trước',
-            transactionHash: '0x1234567890abcdef'
-          },
-          {
-            id: 2,
-            type: 'shipment_delivered',
-            message: 'Shipment #SH001230 đã được giao thành công',
-            timestamp: '15 phút trước',
-            transactionHash: '0x2345678901bcdefg'
-          }
-        ],
-        chartData: [
-          { month: 'T1', shipments: 45, delivered: 42 },
-          { month: 'T2', shipments: 52, delivered: 48 },
-          { month: 'T3', shipments: 48, delivered: 46 },
-          { month: 'T4', shipments: 61, delivered: 58 },
-          { month: 'T5', shipments: 55, delivered: 52 },
-          { month: 'T6', shipments: 67, delivered: 64 }
-        ]
-      }
-    });
-  }
+  // Shipments by recipient (inbound for distributor) -> GET /api/blockchain/drugs/shipments/recipient/{recipientAddress}
+  getShipmentsByRecipient: (recipientAddress) => apiClient.get(`/blockchain/drugs/shipments/recipient/${recipientAddress}`)
 };
 
 // Service functions
@@ -235,26 +113,46 @@ export const distributorService = {
   // Dashboard
   getDashboardData: async () => {
     try {
-      // Try blockchain health check first
-      await blockchainAPI.healthCheck();
-      
-      // If backend is available, use real data
-      // For now, use mock data
-      return mockDataService.getDashboardStats();
+      return await apiClient.get('/blockchain/drugs/stats');
     } catch (error) {
-      console.warn('Using mock data due to backend unavailability:', error.message);
-      return mockDataService.getDashboardStats();
+      console.error('Failed to get dashboard data:', error.message);
+      throw error;
     }
   },
 
   // Batches
   getBatches: async () => {
     try {
-      // Try to get real data from blockchain
-      return await blockchainAPI.getAllBatches();
+      return await apiClient.get('/blockchain/drugs/batches');
     } catch (error) {
-      console.warn('Using mock batch data:', error.message);
-      return mockDataService.getBatches();
+      console.error('Failed to get batches:', error.message);
+      throw error;
+    }
+  },
+
+  // Batches owned by distributor
+  getBatchesByOwner: async (ownerAddress) => {
+    if (!ownerAddress) {
+      throw new Error('Owner address is required');
+    }
+    try {
+      return await blockchainAPI.getBatchesByOwner(ownerAddress);
+    } catch (error) {
+      console.error('Failed to get batches by owner:', error.message);
+      throw error;
+    }
+  },
+
+  // Get distributor inventory with REAL available quantities
+  getInventoryByWallet: async (walletAddress) => {
+    if (!walletAddress) {
+      throw new Error('Wallet address is required');
+    }
+    try {
+      return await apiClient.get(`/distributor/inventory/wallet/${walletAddress}`);
+    } catch (error) {
+      console.error('Failed to get inventory by wallet:', error.message);
+      throw error;
     }
   },
 
@@ -262,7 +160,7 @@ export const distributorService = {
     try {
       return await blockchainAPI.getBatchDetails(batchId);
     } catch (error) {
-      console.warn('Failed to get batch details:', error.message);
+      console.error('Failed to get batch details:', error.message);
       throw error;
     }
   },
@@ -270,42 +168,36 @@ export const distributorService = {
   // Pharmacies
   getPharmacies: async () => {
     try {
-      // For now, use mock data (implement real pharmacy API later)
-      return mockDataService.getPharmacies();
+      return await apiClient.get('/pharmacies');
     } catch (error) {
-      console.warn('Using mock pharmacy data:', error.message);
-      return mockDataService.getPharmacies();
+      console.error('Failed to get pharmacies:', error.message);
+      throw error;
     }
   },
 
   // Shipments
   createShipment: async (shipmentData) => {
     try {
-      const response = await blockchainAPI.createShipment({
-        batchId: parseInt(shipmentData.batchId.replace('BT', '')),
-        pharmacyAddress: shipmentData.pharmacyAddress,
-        quantity: parseInt(shipmentData.quantity),
-        trackingNumber: shipmentData.trackingNumber
-      });
+      // Normalize batchId - remove any prefix and convert to BigInteger compatible string
+      let batchId = shipmentData.batchId;
+      if (typeof batchId === 'string' && batchId.startsWith('BT')) {
+        batchId = batchId.replace('BT', '');
+      }
       
-      return {
-        success: true,
-        data: response.data,
-        transactionHash: response.transactionHash,
-        message: 'Shipment đã được tạo thành công trên blockchain'
-      };
+      // Use the distributor-specific endpoint with pharmacyId
+      return await apiClient.post('/distributor/shipments', {
+        batchId: batchId.toString(), // Ensure string for BigInteger parsing
+        pharmacyId: parseInt(shipmentData.pharmacyId),
+        quantity: parseInt(shipmentData.quantity),
+        trackingNumber: shipmentData.trackingNumber,
+        notes: shipmentData.notes || '',
+        driverName: shipmentData.driverName || '',
+        driverPhone: shipmentData.driverPhone || '',
+        transportMethod: shipmentData.transportMethod || 'Xe tải'
+      });
     } catch (error) {
       console.error('Failed to create shipment:', error.message);
-      
-      // For demo purposes, simulate success
-      return {
-        success: true,
-        data: {
-          shipmentId: `SH${Date.now()}`,
-          transactionHash: `0x${Math.random().toString(16).substr(2, 40)}`
-        },
-        message: 'Shipment đã được tạo thành công (Demo mode)'
-      };
+      throw error;
     }
   },
 
@@ -313,8 +205,8 @@ export const distributorService = {
     try {
       return await blockchainAPI.getShipments(filters);
     } catch (error) {
-      console.warn('Using mock shipment data:', error.message);
-      return mockDataService.getShipments();
+      console.error('Failed to get shipments:', error.message);
+      throw error;
     }
   },
 
@@ -322,7 +214,27 @@ export const distributorService = {
     try {
       return await blockchainAPI.getShipmentById(shipmentId);
     } catch (error) {
-      console.warn('Failed to get shipment details:', error.message);
+      console.error('Failed to get shipment details:', error.message);
+      throw error;
+    }
+  },
+
+  // Shipments by batch
+  getShipmentsByBatch: async (batchId) => {
+    try {
+      return await blockchainAPI.getShipmentsByBatch(batchId);
+    } catch (error) {
+      console.error('Failed to get shipments by batch:', error.message);
+      throw error;
+    }
+  },
+
+  // Shipments by recipient
+  getShipmentsByRecipient: async (recipientAddress) => {
+    try {
+      return await blockchainAPI.getShipmentsByRecipient(recipientAddress);
+    } catch (error) {
+      console.error('Failed to get shipments by recipient:', error.message);
       throw error;
     }
   },
@@ -332,56 +244,108 @@ export const distributorService = {
     try {
       return await blockchainAPI.verifyDrug(qrCode);
     } catch (error) {
-      console.warn('Failed to verify drug:', error.message);
+      console.error('Failed to verify drug:', error.message);
+      throw error;
+    }
+  },
+
+  // Verify shipment ownership on blockchain - Anti-counterfeit check
+  verifyShipmentOwnership: async (shipmentId, expectedOwner) => {
+    try {
+      return await apiClient.get(`/blockchain/drugs/shipments/${shipmentId}/verify-ownership`, {
+        params: { expectedOwner }
+      });
+    } catch (error) {
+      console.error('Failed to verify shipment ownership:', error.message);
       throw error;
     }
   },
 
   // Receive Goods (Nhập kho từ NSX)
-  confirmReceiveGoods: async (receiveData) => {
+  receiveShipment: async (shipmentId) => {
     try {
-      return await blockchainAPI.confirmReceiveGoods(receiveData);
+      return await blockchainAPI.receiveShipment(shipmentId);
     } catch (error) {
-      console.warn('Failed to confirm receive goods:', error.message);
-      // Return mock response for testing
-      return {
-        success: true,
-        data: {
-          transactionHash: '0x' + Math.random().toString(16).substr(2, 64),
-          blockNumber: Math.floor(Math.random() * 1000000),
-          gasUsed: '21000'
-        },
-        message: 'Đã xác nhận nhận hàng thành công (Mock response)'
-      };
+      console.error('Failed to receive shipment:', error.message);
+      throw error;
     }
   },
 
-  // Get pending inbound shipments
-  getPendingInboundShipments: async () => {
+  // Get pending inbound shipments for a recipient
+  getInboundShipments: async (recipientAddress) => {
     try {
-      return await blockchainAPI.getPendingInboundShipments();
+      const response = await distributorService.getShipmentsByRecipient(recipientAddress);
+      if (response.success && response.data) {
+        // Filter for shipments that are 'in_transit' and not yet received
+        return {
+          ...response,
+          data: response.data.filter(shipment => shipment.status === 'in_transit')
+        };
+      }
+      return { success: true, data: [] };
     } catch (error) {
-      console.warn('Failed to get pending inbound shipments:', error.message);
-      // Return mock data for testing
-      return {
-        success: true,
-        data: [
-          {
-            id: 'SHIP001',
-            from: 'Công ty Dược phẩm ABC',
-            trackingCode: 'TRK123456789',
-            expectedDate: '2024-09-20',
-            products: [
-              { name: 'Paracetamol 500mg', quantity: 5000, batchCode: 'BT2024001' },
-              { name: 'Amoxicillin 250mg', quantity: 3000, batchCode: 'BT2024002' }
-            ],
-            totalValue: 450000000
-          }
-        ]
-      };
+      console.error('Failed to get inbound shipments:', error.message);
+      throw error;
+    }
+  },
+
+  // ==================== DISTRIBUTOR INVENTORY APIs ====================
+
+  // Get distributor inventory by wallet address
+  getDistributorInventory: async (walletAddress) => {
+    try {
+      return await apiClient.get(`/distributor/inventory/wallet/${walletAddress}`);
+    } catch (error) {
+      console.error('Failed to get distributor inventory:', error.message);
+      throw error;
+    }
+  },
+
+  // Get low stock items
+  getDistributorLowStock: async (distributorId) => {
+    try {
+      return await apiClient.get(`/distributor/inventory/company/${distributorId}/low-stock`);
+    } catch (error) {
+      console.error('Failed to get low stock items:', error.message);
+      throw error;
+    }
+  },
+
+  // Get expiring soon items
+  getDistributorExpiringSoon: async (distributorId) => {
+    try {
+      return await apiClient.get(`/distributor/inventory/company/${distributorId}/expiring-soon`);
+    } catch (error) {
+      console.error('Failed to get expiring soon items:', error.message);
+      throw error;
+    }
+  },
+
+  // Search distributor inventory
+  searchDistributorInventory: async (distributorId, searchTerm) => {
+    try {
+      return await apiClient.get(`/distributor/inventory/company/${distributorId}/search`, {
+        params: { searchTerm }
+      });
+    } catch (error) {
+      console.error('Failed to search inventory:', error.message);
+      throw error;
+    }
+  },
+
+  // Get total inventory value
+  getDistributorInventoryValue: async (distributorId) => {
+    try {
+      return await apiClient.get(`/distributor/inventory/company/${distributorId}/total-value`);
+    } catch (error) {
+      console.error('Failed to get inventory value:', error.message);
+      throw error;
     }
   }
 };
+
+// Export API client for auth service
+export { apiClient };
 
 // Export default
 export default distributorService;

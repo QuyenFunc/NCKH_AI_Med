@@ -203,6 +203,7 @@
 }
 
 .user-menu {
+  position: relative;
   display: flex;
   align-items: center;
 }
@@ -221,6 +222,73 @@
 
 .user-btn:hover {
   background-color: #f3f4f6;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  min-width: 200px;
+  z-index: 1000;
+}
+
+.user-info {
+  padding: 1rem;
+}
+
+.user-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
+}
+
+.user-email {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background-color: #e5e7eb;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #374151;
+  text-align: left;
+  transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+  background-color: #f3f4f6;
+}
+
+.dropdown-item:first-of-type {
+  border-radius: 0 0 0 0;
+}
+
+.dropdown-item:last-child {
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+
+.logout-btn {
+  color: #dc2626;
+}
+
+.logout-btn:hover {
+  background-color: #fee2e2;
 }
 
 .main-content {

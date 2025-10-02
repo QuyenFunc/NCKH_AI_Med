@@ -9,17 +9,20 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "shipments")
+@Table(name = "drug_shipments")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Shipment {
 
     @Id
@@ -28,44 +31,68 @@ public class Shipment {
     private Long id;
 
     @NotNull
-    @Column(name = "shipment_id", nullable = false, unique = true)
+    @Size(max = 100)
+    @Column(name = "shipment_code", nullable = false, unique = true, length = 100)
+    private String shipmentCode;
+    
+    // Keep shipment_id for blockchain compatibility (can be stored in notes or tracking_info)
+    @Transient
     private BigInteger shipmentId;
 
-    @NotNull
-    @Size(max = 42)
-    @Column(name = "from_address", nullable = false, length = 42)
+    // Blockchain addresses (stored in tracking_info or notes)
+    @Transient
     private String fromAddress;
-
-    @NotNull
-    @Size(max = 42)
-    @Column(name = "to_address", nullable = false, length = 42)
+    
+    @Transient
     private String toAddress;
+    
+    // Company relationships
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "from_company_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private PharmaCompany fromCompany;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "to_company_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private PharmaCompany toCompany;
 
     @NotNull
     @Column(name = "quantity", nullable = false)
-    private Long quantity;
+    private Integer quantity;
 
-    @NotNull
-    @Column(name = "shipment_timestamp", nullable = false)
-    private LocalDateTime shipmentTimestamp;
+    @Column(name = "shipment_date")
+    private LocalDateTime shipmentDate;
+    
+    @Column(name = "expected_delivery_date")
+    private LocalDateTime expectedDeliveryDate;
+    
+    @Column(name = "actual_delivery_date")
+    private LocalDateTime actualDeliveryDate;
 
-    @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "shipment_status")
     private ShipmentStatus status = ShipmentStatus.PENDING;
 
-    @Size(max = 1000)
-    @Column(name = "tracking_info")
-    private String trackingInfo;
-
     @Size(max = 66)
-    @Column(name = "transaction_hash", length = 66)
-    private String transactionHash;
-
-    @Column(name = "block_number")
+    @Column(name = "create_tx_hash", length = 66)
+    private String createTxHash;
+    
+    @Size(max = 66)
+    @Column(name = "receive_tx_hash", length = 66)
+    private String receiveTxHash;
+    
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+    
+    // Store blockchain data in notes field as JSON
+    @Transient
+    private String trackingInfo;
+    
+    @Transient
     private BigInteger blockNumber;
-
-    @Column(name = "is_synced", nullable = false)
+    
+    @Transient
     private Boolean isSynced = false;
 
     @CreatedDate
@@ -79,16 +106,18 @@ public class Shipment {
     // Many-to-one relationship with drug batch
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "batch_id", referencedColumnName = "id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private DrugBatch drugBatch;
 
     // One-to-many relationship with blockchain transactions
     @OneToMany(mappedBy = "shipment", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private List<BlockchainTransaction> transactions;
 
     public enum ShipmentStatus {
         PENDING,
         IN_TRANSIT,
         DELIVERED,
-        CANCELED
+        CANCELLED
     }
 }

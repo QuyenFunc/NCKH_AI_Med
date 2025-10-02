@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Search, Filter, Eye, Calendar, MapPin, Package } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Filter, Eye, Calendar, MapPin, Package, AlertTriangle } from 'lucide-react';
+import pharmacyService from '../../services/apiService';
 import './ManageShipments.css';
 
 function ManageShipments() {
@@ -7,77 +8,60 @@ function ManageShipments() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [selectedShipment, setSelectedShipment] = useState(null);
+  
+  // Real data from API
+  const [shipments, setShipments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data cho lô hàng
-  const shipments = [
-    {
-      id: 'LOT001234',
-      pharmacy: 'Hiệu thuốc ABC',
-      pharmacyAddress: '123 Nguyễn Trãi, Q1, HCM',
-      createdDate: '2024-01-15',
-      deliveryDate: '2024-01-17',
-      status: 'shipping',
-      items: [
-        { name: 'Paracetamol 500mg', quantity: 1000, batchNumber: 'LOT2024001' },
-        { name: 'Amoxicillin 250mg', quantity: 500, batchNumber: 'LOT2024002' }
-      ],
-      transportMethod: 'Xe tải',
-      notes: 'Giao hàng trong giờ hành chính'
-    },
-    {
-      id: 'LOT001233',
-      pharmacy: 'Hiệu thuốc XYZ',
-      pharmacyAddress: '456 Lê Lợi, Q3, HCM',
-      createdDate: '2024-01-14',
-      deliveryDate: '2024-01-16',
-      status: 'delivered',
-      items: [
-        { name: 'Vitamin C 1000mg', quantity: 2000, batchNumber: 'LOT2024003' }
-      ],
-      transportMethod: 'Xe van',
-      notes: ''
-    },
-    {
-      id: 'LOT001232',
-      pharmacy: 'Hiệu thuốc DEF',
-      pharmacyAddress: '789 Hai Bà Trưng, Q1, HCM',
-      createdDate: '2024-01-13',
-      deliveryDate: '2024-01-15',
-      status: 'delayed',
-      items: [
-        { name: 'Aspirin 300mg', quantity: 800, batchNumber: 'LOT2024004' },
-        { name: 'Ibuprofen 400mg', quantity: 600, batchNumber: 'LOT2024005' }
-      ],
-      transportMethod: 'Xe tải',
-      notes: 'Khách hàng yêu cầu gọi trước khi giao'
-    },
-    {
-      id: 'LOT001231',
-      pharmacy: 'Hiệu thuốc GHI',
-      pharmacyAddress: '321 Điện Biên Phủ, Q10, HCM',
-      createdDate: '2024-01-12',
-      deliveryDate: '2024-01-14',
-      status: 'delivered',
-      items: [
-        { name: 'Cetirizine 10mg', quantity: 1200, batchNumber: 'LOT2024006' }
-      ],
-      transportMethod: 'Xe máy',
-      notes: ''
-    },
-    {
-      id: 'LOT001230',
-      pharmacy: 'Hiệu thuốc JKL',
-      pharmacyAddress: '654 Cách Mạng Tháng Tám, Q3, HCM',
-      createdDate: '2024-01-11',
-      deliveryDate: '2024-01-13',
-      status: 'shipping',
-      items: [
-        { name: 'Omeprazole 20mg', quantity: 400, batchNumber: 'LOT2024007' }
-      ],
-      transportMethod: 'Xe van',
-      notes: 'Hàng dễ vỡ, cẩn thận khi vận chuyển'
+  useEffect(() => {
+    fetchShipments();
+  }, []);
+
+  const fetchShipments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Get shipments from API
+      const response = await pharmacyService.getAllShipments();
+      
+      if (response.success && response.data) {
+        // Transform API data to component format
+        const transformedData = response.data.map(shipment => ({
+          id: shipment.shipmentCode || shipment.id,
+          pharmacy: shipment.toCompanyName || 'Hiệu thuốc',
+          pharmacyAddress: shipment.toAddress || 'N/A',
+          createdDate: shipment.shipmentDate || shipment.createdAt,
+          deliveryDate: shipment.expectedDeliveryDate || shipment.createdAt,
+          status: mapShipmentStatus(shipment.shipmentStatus),
+          items: shipment.items || [],
+          transportMethod: shipment.transportMethod || 'Xe tải',
+          notes: shipment.notes || ''
+        }));
+        
+        setShipments(transformedData);
+      } else {
+        setShipments([]);
+      }
+    } catch (err) {
+      console.error('Error fetching shipments:', err);
+      setError('Không thể tải dữ liệu lô hàng');
+      setShipments([]);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const mapShipmentStatus = (status) => {
+    const statusMap = {
+      'PENDING': 'shipping',
+      'IN_TRANSIT': 'shipping',
+      'DELIVERED': 'delivered',
+      'CANCELLED': 'delayed'
+    };
+    return statusMap[status?.toUpperCase()] || 'shipping';
+  };
 
   const getStatusDisplay = (status) => {
     const statusMap = {
@@ -125,6 +109,29 @@ function ManageShipments() {
   const closeModal = () => {
     setSelectedShipment(null);
   };
+
+  if (loading) {
+    return (
+      <div className="manage-shipments">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Đang tải dữ liệu lô hàng...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="manage-shipments">
+        <div className="error-container">
+          <AlertTriangle size={48} />
+          <p>{error}</p>
+          <button className="btn btn-primary" onClick={fetchShipments}>Thử lại</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="manage-shipments">

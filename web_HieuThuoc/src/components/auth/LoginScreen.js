@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Lock, User, Package } from 'lucide-react';
+import { Lock, User, Package, AlertCircle } from 'lucide-react';
 import './LoginScreen.css';
 
 function LoginScreen() {
@@ -27,14 +27,9 @@ function LoginScreen() {
     }
   };
 
-  const handleDemoLogin = (role) => {
-    if (role === 'distributor') {
-      setEmail('distributor@demo.com');
-      setPassword('demo123');
-    } else {
-      setEmail('pharmacy@demo.com');
-      setPassword('demo123');
-    }
+  const handleDemoLogin = () => {
+    setEmail('pharmacy@ankhang.com');
+    setPassword('123456');
   };
 
   return (
@@ -42,8 +37,8 @@ function LoginScreen() {
       <div className="login-card">
         <div className="login-header">
           <Package className="login-icon" />
-          <h1>Partner Portal</h1>
-          <p>Cổng thông tin đối tác</p>
+          <h1>Hiệu Thuốc - Portal</h1>
+          <p>Hệ thống quản lý hiệu thuốc</p>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
@@ -81,6 +76,7 @@ function LoginScreen() {
 
           {error && (
             <div className="error-message">
+              <AlertCircle size={16} />
               {error}
             </div>
           )}
@@ -91,21 +87,20 @@ function LoginScreen() {
         </form>
 
         <div className="demo-section">
-          <p>Tài khoản demo:</p>
+          <p>Tài khoản demo (Hiệu thuốc An Khang):</p>
+          <div className="demo-info">
+            <p className="demo-credentials">
+              📧 Email: <strong>pharmacy@ankhang.com</strong><br/>
+              🔑 Password: <strong>123456</strong>
+            </p>
+          </div>
           <div className="demo-buttons">
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => handleDemoLogin('distributor')}
+              onClick={handleDemoLogin}
             >
-              Nhà Phân Phối
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => handleDemoLogin('pharmacy')}
-            >
-              Hiệu Thuốc
+              Điền thông tin Demo
             </button>
           </div>
         </div>

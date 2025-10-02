@@ -1,5 +1,6 @@
 package com.nckh.dia5.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -20,6 +21,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class DrugBatch {
 
     @Id
@@ -101,10 +103,12 @@ public class DrugBatch {
 
     // One-to-many relationship with shipments
     @OneToMany(mappedBy = "drugBatch", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private List<Shipment> shipments;
 
     // One-to-many relationship with blockchain transactions
     @OneToMany(mappedBy = "drugBatch", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private List<BlockchainTransaction> transactions;
 
     public enum BatchStatus {

@@ -3,6 +3,7 @@ package com.nckh.dia5.config;
 import com.nckh.dia5.security.CustomUserDetailsService;
 import com.nckh.dia5.security.JwtAuthenticationEntryPoint;
 import com.nckh.dia5.security.JwtAuthenticationFilter;
+import com.nckh.dia5.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,7 +34,7 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtAuthenticationEntryPoint unauthorizedHandler;
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -60,19 +61,33 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> authz
+                        // Public endpoints - no authentication required
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/public/**").permitAll()
-                        .requestMatchers("/api/blockchain/health").permitAll()
-                        .requestMatchers("/api/blockchain/public/**").permitAll()
-                        .requestMatchers("/api/chat/**").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/api/distributor/auth/**").permitAll()
+                        .requestMatchers("/api/manufacturer/auth/**").permitAll()
+                        .requestMatchers("/api/pharmacy/auth/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/api/blockchain/drugs/debug/**").permitAll() // Debug endpoints
+                        .requestMatchers("/api/products/debug/**").permitAll() // Products debug endpoints
+                        .requestMatchers("/api/blockchain/drugs/batches").permitAll() // Temporary for testing
+                        .requestMatchers("/api/blockchain/drugs/shipments/**").permitAll() // Temporary for testing
+                        .requestMatchers("/api/blockchain/drugs/distributors").permitAll() // Get distributors for frontend
+                        .requestMatchers("/api/blockchain/drugs/stats").permitAll() // Dashboard stats
+                        .requestMatchers("/api/blockchain/drugs/distributor/**").permitAll() // Distributor tracking endpoints
+                        .requestMatchers("/error").permitAll() // Error page
+                        // All other endpoints require authentication
                         .anyRequest().authenticated());
 
+        // Enable authentication
         http.authenticationProvider(authenticationProvider());
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public JwtAuthenticationFilter jwtAuthenticationFilter() {
+        return new JwtAuthenticationFilter(jwtTokenProvider, customUserDetailsService);
     }
 
     @Bean

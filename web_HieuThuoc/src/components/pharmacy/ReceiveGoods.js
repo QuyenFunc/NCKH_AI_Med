@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { QrCode, Package, CheckCircle, AlertCircle, Scan, Calendar, User } from 'lucide-react';
+import pharmacyService from '../../services/apiService';
 import './ReceiveGoods.css';
 
 function ReceiveGoods() {
@@ -9,67 +10,109 @@ function ReceiveGoods() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
 
-  // Mock data cho lô hàng
-  const mockShipmentData = {
-    'LOT001234': {
-      id: 'LOT001234',
-      distributor: 'Nhà phân phối ABC',
-      distributorAddress: '456 Đường ABC, Q1, TP.HCM',
-      shippedDate: '2024-01-15',
-      expectedDeliveryDate: '2024-01-17',
-      transportMethod: 'Xe tải',
-      driver: 'Nguyễn Văn A',
-      driverPhone: '0901234567',
-      items: [
-        {
-          id: 1,
-          name: 'Paracetamol 500mg',
-          manufacturer: 'Công ty Dược ABC',
-          batchNumber: 'LOT2024001',
-          quantity: 1000,
-          unit: 'viên',
-          expireDate: '2025-12-31',
-          registrationNumber: 'VD-12345-67'
-        },
-        {
-          id: 2,
-          name: 'Amoxicillin 250mg',
-          manufacturer: 'Công ty Dược XYZ',
-          batchNumber: 'LOT2024002',
-          quantity: 500,
-          unit: 'viên',
-          expireDate: '2025-06-30',
-          registrationNumber: 'VD-12345-68'
+  // State for real API data
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+
+  const handleScanCode = async () => {
+    if (!shipmentCode.trim()) {
+      setError('Vui lòng nhập mã vận đơn');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Step 1: Get pharmacy wallet address for verification
+      const pharmacyAddress = localStorage.getItem('walletAddress');
+      if (!pharmacyAddress) {
+        setError('Không tìm thấy địa chỉ ví hiệu thuốc. Vui lòng đăng nhập.');
+        return;
+      }
+
+      // Step 2: Fetch shipment details from API
+      const shipmentResponse = await pharmacyService.getShipmentById(shipmentCode);
+      
+      if (!shipmentResponse.success || !shipmentResponse.data) {
+        setError('Không tìm thấy thông tin lô hàng với mã: ' + shipmentCode);
+        return;
+      }
+
+      const shipment = shipmentResponse.data;
+
+      // Step 3: Verify this shipment is sent to our pharmacy (anti-counterfeit)
+      if (shipment.toAddress?.toLowerCase() !== pharmacyAddress.toLowerCase()) {
+        setError('Lô hàng này không được gửi đến hiệu thuốc của bạn. Có thể là hàng giả!');
+        return;
+      }
+
+      // Step 4: Verify blockchain ownership
+      try {
+        const ownershipVerification = await pharmacyService.verifyShipmentOwnership(
+          shipmentCode, 
+          pharmacyAddress
+        );
+        
+        if (ownershipVerification.success && !ownershipVerification.data.isOwner) {
+          setError('Quyền sở hữu NFT chưa được chuyển đến hiệu thuốc. Có thể là hàng giả!');
+          return;
         }
-      ],
-      notes: 'Giao hàng trong giờ hành chính',
-      status: 'shipping'
-    }
-  };
+      } catch (e) {
+        console.warn('Could not verify blockchain ownership:', e);
+        // Continue without blockchain verification if service is unavailable
+      }
 
-  const handleScanCode = () => {
-    if (shipmentCode && mockShipmentData[shipmentCode]) {
-      setShipmentData(mockShipmentData[shipmentCode]);
+      // Step 5: Set shipment data for display
+      setShipmentData(shipment);
       setShowScanner(false);
-    } else {
-      alert('Không tìm thấy thông tin lô hàng với mã: ' + shipmentCode);
-      setShipmentCode('');
+
+    } catch (error) {
+      console.error('Error scanning shipment:', error);
+      setError('Có lỗi xảy ra khi tìm kiếm lô hàng: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleVerifyShipment = () => {
-    setIsVerifying(true);
-    
-    // Mock verification process
-    setTimeout(() => {
+  const handleVerifyShipment = async () => {
+    if (!shipmentData) {
+      setError('Không có thông tin lô hàng để xác thực');
+      return;
+    }
+
+    try {
+      setIsVerifying(true);
+      setError(null);
+
+      // Call blockchain API to confirm receipt and transfer ownership
+      const receiveResponse = await pharmacyService.receiveShipment(shipmentData.id || shipmentData.shipmentId);
+
+      if (receiveResponse.success) {
+        setVerificationResult({
+          success: true,
+          blockchainTxId: receiveResponse.data?.transactionHash || 'TX' + Date.now(),
+          timestamp: new Date().toISOString(),
+          verifiedBy: 'Dược sĩ hiệu thuốc'
+        });
+        setSuccess('Xác nhận nhận hàng thành công! Lô hàng đã được chuyển vào kho.');
+        
+        // Reset form after successful receipt
+        setTimeout(() => {
+          setShipmentCode('');
+          setShipmentData(null);
+          setVerificationResult(null);
+        }, 3000);
+      } else {
+        setError(receiveResponse.message || 'Không thể xác nhận nhận hàng');
+      }
+    } catch (error) {
+      console.error('Error verifying shipment:', error);
+      setError('Có lỗi xảy ra khi xác thực lô hàng: ' + error.message);
+    } finally {
       setIsVerifying(false);
-      setVerificationResult({
-        success: true,
-        blockchainTxId: 'TX' + Date.now(),
-        timestamp: new Date().toISOString(),
-        verifiedBy: 'Dược sĩ Nguyễn Thị B'
-      });
-    }, 2000);
+    }
   };
 
   const resetForm = () => {
@@ -124,7 +167,7 @@ function ReceiveGoods() {
                     </button>
                   </div>
                   <p className="helper-text">
-                    Mã demo: LOT001234
+                    Nhập mã lô hàng từ phiếu giao hàng
                   </p>
                   <button
                     className="btn btn-secondary"

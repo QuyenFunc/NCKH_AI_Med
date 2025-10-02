@@ -38,7 +38,16 @@ public class BlockchainConfig {
     public Web3j web3j() {
         try {
             log.info("Connecting to blockchain network: {}", blockchainNetworkUrl);
-            Web3j web3j = Web3j.build(new HttpService(blockchainNetworkUrl));
+            
+            // Create HttpService with timeout settings
+            okhttp3.OkHttpClient httpClient = new okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .build();
+            
+            HttpService httpService = new HttpService(blockchainNetworkUrl, httpClient);
+            Web3j web3j = Web3j.build(httpService);
             
             // Test connection (non-blocking for startup)
             try {
@@ -52,7 +61,12 @@ public class BlockchainConfig {
         } catch (Exception e) {
             log.error("Failed to initialize blockchain connection: {}", blockchainNetworkUrl, e);
             // Return a Web3j instance anyway to allow startup
-            return Web3j.build(new HttpService(blockchainNetworkUrl));
+            okhttp3.OkHttpClient httpClient = new okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .build();
+            return Web3j.build(new HttpService(blockchainNetworkUrl, httpClient));
         }
     }
 

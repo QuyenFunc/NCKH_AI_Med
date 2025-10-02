@@ -26,37 +26,16 @@ const ReceiveGoods = () => {
 
   const fetchPendingShipments = async () => {
     try {
-      // Mock data - replace with actual API call
-      const mockPendingShipments = [
-        {
-          id: 'SH001',
-          from: 'Nhà phân phối ABC',
-          fromType: 'distributor',
-          trackingCode: 'TRK123456789',
-          expectedDate: '2024-09-20',
-          products: [
-            { name: 'Paracetamol 500mg', quantity: 1000, batchCode: 'BT2024001', expiry: '2027-09-15' },
-            { name: 'Amoxicillin 250mg', quantity: 500, batchCode: 'BT2024002', expiry: '2026-09-16' }
-          ],
-          totalValue: 150000000,
-          driverName: 'Nguyễn Văn A',
-          vehicleNumber: '29A-123456'
-        },
-        {
-          id: 'SH002',
-          from: 'Công ty Dược DEF', 
-          fromType: 'manufacturer',
-          trackingCode: 'TRK987654321',
-          expectedDate: '2024-09-21',
-          products: [
-            { name: 'Vitamin C 1000mg', quantity: 800, batchCode: 'BT2024003', expiry: '2026-03-10' }
-          ],
-          totalValue: 80000000
-        }
-      ];
-      setPendingShipments(mockPendingShipments);
+      // Get shipments targeted to this pharmacy from API
+      const response = await pharmacyService.getPendingShipments();
+      if (response.success) {
+        setPendingShipments(response.data);
+      } else {
+        setPendingShipments([]);
+      }
     } catch (err) {
       console.error('Error fetching pending shipments:', err);
+      setPendingShipments([]);
     }
   };
 
@@ -70,42 +49,73 @@ const ReceiveGoods = () => {
       setLoading(true);
       setError(null);
       
-      // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Find matching shipment from pending list
+      // Step 1: Find matching shipment from pending list first
       const foundShipment = pendingShipments.find(
-        shipment => shipment.trackingCode === scanInput || shipment.id === scanInput
+        shipment => shipment.trackingCode === scanInput || 
+                   shipment.id === scanInput ||
+                   shipment.shipmentId === scanInput
       );
 
       if (foundShipment) {
         setShipmentDetails(foundShipment);
-      } else {
-        // Mock successful scan with sample data
-        const mockShipmentDetails = {
-          id: scanInput,
-          from: 'Nhà phân phối ABC',
-          fromType: 'distributor',
-          trackingCode: scanInput,
-          expectedDate: '2024-09-20',
-          products: [
-            { 
-              name: 'Paracetamol 500mg', 
-              quantity: 500, 
-              batchCode: 'BT2024' + scanInput.slice(-3),
-              expiry: '2027-12-31',
-              manufacturer: 'Công ty Dược ABC'
-            }
-          ],
-          totalValue: 75000000,
-          driverName: 'Trần Văn B',
-          vehicleNumber: '30A-654321',
-          notes: 'Hàng cần kiểm tra nhiệt độ, bảo quản nơi khô ráo'
-        };
-        setShipmentDetails(mockShipmentDetails);
+        return;
+      }
+
+      // Step 2: Try to get shipment by ID directly (for shipment IDs)
+      try {
+        const shipmentResponse = await pharmacyService.getShipmentById(scanInput);
+        if (shipmentResponse.success && shipmentResponse.data) {
+          // Verify this shipment is for our pharmacy
+          const pharmacyAddress = localStorage.getItem('walletAddress');
+          if (pharmacyAddress && 
+              shipmentResponse.data.toAddress?.toLowerCase() === pharmacyAddress.toLowerCase()) {
+            setShipmentDetails(shipmentResponse.data);
+            return;
+          } else {
+            setError('Lô hàng này không được gửi đến hiệu thuốc của bạn. Có thể là hàng giả!');
+            return;
+          }
+        }
+      } catch (shipmentError) {
+        console.log('Shipment not found by ID, trying batch lookup...');
+      }
+
+      // Step 3: Try to find shipments by batch (for batch IDs or QR codes)
+      try {
+        const shipmentsResponse = await pharmacyService.getShipmentsByBatch(scanInput);
+        if (shipmentsResponse.success && shipmentsResponse.data?.length > 0) {
+          const pharmacyAddress = localStorage.getItem('walletAddress');
+          const myShipment = shipmentsResponse.data.find(s => 
+            s.toAddress?.toLowerCase() === pharmacyAddress?.toLowerCase() &&
+            (s.status === 'PENDING' || s.status === 'IN_TRANSIT')
+          );
+          
+          if (myShipment) {
+            setShipmentDetails(myShipment);
+            return;
+          } else {
+            setError('Không tìm thấy lô hàng nào được gửi đến hiệu thuốc của bạn với mã: ' + scanInput);
+            return;
+          }
+        }
+      } catch (batchError) {
+        console.log('Batch lookup failed:', batchError.message);
+      }
+
+      // Step 4: Final fallback - try general shipment info lookup
+      try {
+        const response = await pharmacyService.getShipmentInfo(scanInput);
+        if (response.success && response.data) {
+          setShipmentDetails(response.data);
+        } else {
+          setError('Không thể tìm thấy thông tin lô hàng với mã: ' + scanInput + '. Vui lòng kiểm tra lại mã hoặc liên hệ nhà cung cấp.');
+        }
+      } catch (apiError) {
+        setError('Không thể tìm thấy thông tin lô hàng với mã: ' + scanInput + '. Vui lòng kiểm tra lại mã hoặc liên hệ nhà cung cấp.');
       }
     } catch (err) {
-      setError('Không thể tìm thấy thông tin lô hàng: ' + err.message);
+      console.error('Error in handleScan:', err);
+      setError('Lỗi khi tìm kiếm lô hàng: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -354,12 +364,12 @@ const ReceiveGoods = () => {
         <div className="pending-header">
           <h3>
             <Truck size={24} />
-            Lô hàng đang chờ nhận ({pendingShipments.length})
+            Lô hàng đang chờ nhận ({pendingShipments?.length || 0})
           </h3>
         </div>
 
         <div className="pending-grid">
-          {pendingShipments.length === 0 ? (
+          {!pendingShipments || pendingShipments.length === 0 ? (
             <div className="no-pending">
               <Package size={48} className="no-data-icon" />
               <h4>Không có lô hàng nào đang chờ</h4>
@@ -383,10 +393,10 @@ const ReceiveGoods = () => {
                     Dự kiến: {formatDate(shipment.expectedDate)}
                   </div>
                   <div className="products-count">
-                    {shipment.products.length} sản phẩm
+                    {shipment.products?.length || 0} sản phẩm
                   </div>
                   <div className="total-value">
-                    {formatCurrency(shipment.totalValue)}
+                    {formatCurrency(shipment.totalValue || 0)}
                   </div>
                 </div>
                 <div className="pending-actions">

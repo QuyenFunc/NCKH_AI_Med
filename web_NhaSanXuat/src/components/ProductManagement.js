@@ -18,6 +18,8 @@ import './ProductManagement.css';
 const ProductManagement = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [fetchingRef, setFetchingRef] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -52,153 +54,136 @@ const ProductManagement = () => {
   }, []);
 
   const fetchProducts = async () => {
+    // Prevent multiple simultaneous calls
+    if (fetchingRef) {
+      console.log('ProductManagement: Already fetching, skipping...');
+      return;
+    }
+    
     try {
+      setFetchingRef(true);
       setLoading(true);
+      setError(null);
       
-      // Mock data - replace with actual API call
-      const mockProducts = [
-        {
-          id: 'PROD001',
-          name: 'Paracetamol 500mg',
-          category: 'Giảm đau hạ sốt',
-          dosage: '500mg',
-          unit: 'viên',
-          activeIngredient: 'Paracetamol',
-          description: 'Thuốc giảm đau, hạ sốt hiệu quả',
-          storageConditions: 'Nơi khô ráo, tránh ánh sáng',
-          shelfLife: '36 tháng',
-          status: 'active',
-          createdDate: '2024-01-15',
-          totalBatches: 25,
-          totalProduced: 125000
-        },
-        {
-          id: 'PROD002',
-          name: 'Amoxicillin 250mg',
-          category: 'Kháng sinh',
-          dosage: '250mg',
-          unit: 'viên',
-          activeIngredient: 'Amoxicillin',
-          description: 'Kháng sinh phổ rộng',
-          storageConditions: 'Nhiệt độ phòng, tránh ẩm',
-          shelfLife: '24 tháng',
-          status: 'active',
-          createdDate: '2024-02-20',
-          totalBatches: 18,
-          totalProduced: 90000
-        },
-        {
-          id: 'PROD003',
-          name: 'Vitamin C 1000mg',
-          category: 'Vitamin & Khoáng chất',
-          dosage: '1000mg',
-          unit: 'viên',
-          activeIngredient: 'Ascorbic Acid',
-          description: 'Bổ sung vitamin C, tăng cường miễn dịch',
-          storageConditions: 'Nơi khô ráo, nhiệt độ dưới 30°C',
-          shelfLife: '24 tháng',
-          status: 'active',
-          createdDate: '2024-03-10',
-          totalBatches: 20,
-          totalProduced: 200000
-        },
-        {
-          id: 'PROD004',
-          name: 'Aspirin 325mg',
-          category: 'Giảm đau hạ sốt',
-          dosage: '325mg',
-          unit: 'viên',
-          activeIngredient: 'Acetylsalicylic Acid',
-          description: 'Thuốc giảm đau, chống viêm',
-          storageConditions: 'Nơi khô ráo, tránh ánh sáng',
-          shelfLife: '60 tháng',
-          status: 'inactive',
-          createdDate: '2023-12-05',
-          totalBatches: 12,
-          totalProduced: 60000
-        }
-      ];
+      console.log('ProductManagement: Starting fetchProducts...');
       
-      setProducts(mockProducts);
+      // Fetch real data from API
+      const response = await manufacturerService.getProducts();
+      
+      if (response.success && response.data) {
+        setProducts(response.data);
+      } else {
+        setProducts([]);
+        setError(response.message || 'Không thể tải danh sách sản phẩm');
+      }
     } catch (err) {
       console.error('Error fetching products:', err);
+      setError('Không thể tải danh sách sản phẩm: ' + err.message);
+      setProducts([]);
     } finally {
       setLoading(false);
+      setFetchingRef(false);
     }
   };
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.activeIngredient.toLowerCase().includes(searchTerm.toLowerCase());
+      (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.activeIngredient || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
     
     return matchesSearch && matchesStatus;
   });
 
+  // Debug log
+  console.log('ProductManagement: Render - products count:', products.length, 'filtered count:', filteredProducts.length);
+
   const handleAddProduct = async () => {
     try {
-      // Mock API call
-      const productId = 'PROD' + String(products.length + 1).padStart(3, '0');
-      const newProductData = {
-        ...newProduct,
-        id: productId,
-        createdDate: new Date().toISOString().split('T')[0],
-        totalBatches: 0,
-        totalProduced: 0
-      };
-
-      setProducts([...products, newProductData]);
-      setShowAddModal(false);
-      setNewProduct({
-        name: '',
-        category: '',
-        dosage: '',
-        unit: '',
-        description: '',
-        activeIngredient: '',
-        storageConditions: '',
-        shelfLife: '',
-        status: 'active'
-      });
+      // Call real API
+      const response = await manufacturerService.createProduct(newProduct);
+      
+      if (response.success) {
+        // Refresh products list
+        await fetchProducts();
+        setShowAddModal(false);
+        setNewProduct({
+          name: '',
+          category: '',
+          dosage: '',
+          unit: '',
+          description: '',
+          activeIngredient: '',
+          storageConditions: '',
+          shelfLife: '',
+          status: 'active'
+        });
+      } else {
+        setError(response.message || 'Không thể tạo sản phẩm');
+      }
     } catch (err) {
       console.error('Error adding product:', err);
+      setError('Lỗi khi tạo sản phẩm: ' + err.message);
     }
   };
 
   const handleEditProduct = async (productId, updatedData) => {
     try {
-      // Mock API call
-      setProducts(products.map(product => 
-        product.id === productId ? { ...product, ...updatedData } : product
-      ));
-      setEditingProduct(null);
+      // Call real API
+      const response = await manufacturerService.updateProduct(productId, updatedData);
+      
+      if (response.success) {
+        // Refresh products list
+        await fetchProducts();
+        setEditingProduct(null);
+      } else {
+        setError(response.message || 'Không thể cập nhật sản phẩm');
+      }
     } catch (err) {
       console.error('Error updating product:', err);
+      setError('Lỗi khi cập nhật sản phẩm: ' + err.message);
     }
   };
 
   const handleDeleteProduct = async (productId) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa sản phẩm này?')) {
       try {
-        // Mock API call
-        setProducts(products.filter(product => product.id !== productId));
+        // Call real API
+        const response = await manufacturerService.deleteProduct(productId);
+        
+        if (response.success) {
+          // Refresh products list
+          await fetchProducts();
+        } else {
+          setError(response.message || 'Không thể xóa sản phẩm');
+        }
       } catch (err) {
         console.error('Error deleting product:', err);
+        setError('Lỗi khi xóa sản phẩm: ' + err.message);
       }
     }
   };
 
   const handleToggleStatus = async (productId, newStatus) => {
     try {
-      // Mock API call
-      setProducts(products.map(product => 
-        product.id === productId ? { ...product, status: newStatus } : product
-      ));
+      // Find the product and update its status
+      const product = products.find(p => p.id === productId);
+      if (!product) return;
+      
+      const updatedProduct = { ...product, status: newStatus };
+      const response = await manufacturerService.updateProduct(productId, updatedProduct);
+      
+      if (response.success) {
+        // Refresh products list
+        await fetchProducts();
+      } else {
+        setError(response.message || 'Không thể cập nhật trạng thái sản phẩm');
+      }
     } catch (err) {
       console.error('Error updating product status:', err);
+      setError('Lỗi khi cập nhật trạng thái: ' + err.message);
     }
   };
 
@@ -320,9 +305,9 @@ const ProductManagement = () => {
                       )}
                     </span>
                   </td>
-                  <td className="batches">{product.totalBatches}</td>
-                  <td className="produced">{product.totalProduced.toLocaleString()}</td>
-                  <td className="date">{formatDate(product.createdDate)}</td>
+                  <td className="batches">{product.totalBatches || 0}</td>
+                  <td className="produced">{(product.totalProduced || 0).toLocaleString()}</td>
+                  <td className="date">{product.createdAt ? formatDate(product.createdAt) : 'N/A'}</td>
                   <td className="actions">
                     <button 
                       onClick={() => setEditingProduct(product)}
