@@ -48,6 +48,11 @@ const Layout = ({ children }) => {
       icon: Upload
     },
     {
+      name: 'Quản lý Xuất kho',
+      href: '/export-management',
+      icon: BarChart3
+    },
+    {
       name: 'Theo dõi Vận chuyển',
       href: '/shipments',
       icon: Truck

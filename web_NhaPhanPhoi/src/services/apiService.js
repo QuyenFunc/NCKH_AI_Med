@@ -145,13 +145,26 @@ export const distributorService = {
 
   // Get distributor inventory with REAL available quantities
   getInventoryByWallet: async (walletAddress) => {
-    if (!walletAddress) {
-      throw new Error('Wallet address is required');
-    }
     try {
-      return await apiClient.get(`/distributor/inventory/wallet/${walletAddress}`);
+      // ✅ DÙNG API MỚI: /api/warehouse/exportable
+      // Wallet là optional, nếu không có thì lấy tất cả
+      const endpoint = walletAddress 
+        ? `/warehouse/exportable?wallet=${walletAddress}`
+        : `/warehouse/exportable`;
+      
+      console.log('🔍 Calling warehouse API:', endpoint);
+      return await apiClient.get(endpoint);
     } catch (error) {
       console.error('Failed to get inventory by wallet:', error.message);
+      // Fallback to old API nếu mới chưa có
+      if (walletAddress) {
+        console.warn('⚠️ Trying old API as fallback...');
+        try {
+          return await apiClient.get(`/distributor/inventory/wallet/${walletAddress}`);
+        } catch (fallbackError) {
+          console.error('Old API also failed:', fallbackError.message);
+        }
+      }
       throw error;
     }
   },
@@ -206,6 +219,16 @@ export const distributorService = {
       return await blockchainAPI.getShipments(filters);
     } catch (error) {
       console.error('Failed to get shipments:', error.message);
+      throw error;
+    }
+  },
+
+  // Get shipments sent by this distributor (for export management)
+  getShipmentsBySender: async (senderAddress) => {
+    try {
+      return await apiClient.get(`/blockchain/drugs/shipments/sender/${senderAddress}`);
+    } catch (error) {
+      console.error('Failed to get shipments by sender:', error.message);
       throw error;
     }
   },

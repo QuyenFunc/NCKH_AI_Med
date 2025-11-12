@@ -1,5 +1,38 @@
 # NCKH AI Medical - Setup Guide
 
+## ⚠️ BLOCKCHAIN TRACKING UPDATE
+
+Contract `PharmaLedger.sol` đã được nâng cấp để tracking **TOÀN BỘ lịch sử** shipment:
+
+### Tính năng mới:
+- ✅ **Shipment Checkpoints**: Ghi lại từng điểm dừng (warehouse, transit, distribution center)
+- ✅ **Full History**: Lưu ai làm gì, khi nào, ở đâu
+- ✅ **Immutable Tracking**: Không thể xóa/sửa lịch sử đã ghi
+- ✅ **Event Logs**: Emit events cho mỗi checkpoint để dễ query
+
+### API mới:
+```solidity
+// Cập nhật trạng thái + thêm checkpoint
+function updateShipmentStatus(uint256 _shipmentId, ShipmentStatus _newStatus, string _location, string _notes)
+
+// Lấy toàn bộ lịch sử
+function getShipmentHistory(uint256 _shipmentId) returns (ShipmentCheckpoint[])
+
+// Lấy chi tiết + số lượng checkpoints
+function getShipmentDetails(uint256 _shipmentId) returns (ShipmentInfo, uint256 checkpointCount)
+```
+
+### Ví dụ luồng:
+1. Manufacturer tạo shipment → Checkpoint 1: "Origin - Manufacturer"
+2. Update: "Warehouse A" → Checkpoint 2
+3. Update: "Transport Hub" → Checkpoint 3  
+4. Update: "Distribution Center" → Checkpoint 4
+5. Distributor nhận hàng → Checkpoint 5: "Destination - Received"
+
+---
+
+# NCKH AI Medical - Setup Guide
+
 ## Hệ thống truy xuất nguồn gốc thuốc sử dụng Blockchain
 
 ### Prerequisites

@@ -191,7 +191,10 @@ export class AuthService {
   static getUserInfo(): UserInfo | null {
     try {
       const userStr = localStorage.getItem(this.USER_KEY);
-      return userStr ? JSON.parse(userStr) : null;
+      if (!userStr || userStr === 'undefined' || userStr === 'null' || userStr.trim() === '') {
+        return null;
+      }
+      return JSON.parse(userStr);
     } catch {
       return null;
     }

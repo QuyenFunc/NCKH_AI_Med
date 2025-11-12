@@ -106,12 +106,13 @@ public class Shipment {
     // Many-to-one relationship with drug batch
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "batch_id", referencedColumnName = "id")
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "shipments", "transactions"})
     private DrugBatch drugBatch;
 
     // One-to-many relationship with blockchain transactions
     @OneToMany(mappedBy = "shipment", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JsonIgnore
     private List<BlockchainTransaction> transactions;
 
     public enum ShipmentStatus {

@@ -93,8 +93,21 @@ const ShipmentManagement = () => {
       return;
     }
 
-    const batch = availableBatches.find(b => b.batchId == selectedBatch);
+    // Find batch - try both batchId and id fields (use string comparison for batchId)
+    let batch = availableBatches.find(b => String(b.batchId) === String(selectedBatch));
+    if (!batch) {
+      batch = availableBatches.find(b => b.id == selectedBatch);
+    }
     const distributor = distributors.find(d => d.id == selectedDistributor);
+
+    console.log('=== DEBUG ===');
+    console.log('Selected Batch ID:', selectedBatch, 'Type:', typeof selectedBatch);
+    console.log('Found Batch:', batch);
+    console.log('Batch batchId field:', batch?.batchId, 'Type:', typeof batch?.batchId);
+    console.log('Batch id field:', batch?.id);
+    console.log('Available Batches:', availableBatches);
+    console.log('Selected Distributor ID:', selectedDistributor);
+    console.log('Found Distributor:', distributor);
 
     if (!batch || !distributor) {
       setError('Thông tin lô thuốc hoặc nhà phân phối không hợp lệ');
@@ -106,20 +119,44 @@ const ShipmentManagement = () => {
       return;
     }
 
+    // Validate wallet address
+    if (!distributor.walletAddress || !distributor.walletAddress.startsWith('0x')) {
+      setError('Địa chỉ ví nhà phân phối không hợp lệ');
+      return;
+    }
+    
+    if (distributor.walletAddress.length !== 42) {
+      setError(`Địa chỉ ví phải có đúng 42 ký tự (hiện tại: ${distributor.walletAddress.length})`);
+      return;
+    }
+
+    // Use batch.batchId if exists, otherwise use batch.id
+    const actualBatchId = batch.batchId || batch.id;
+    
+    if (!actualBatchId) {
+      setError('Batch không có ID hợp lệ. Vui lòng tạo lại batch trên blockchain.');
+      return;
+    }
+
     try {
       setCreating(true);
       setError(null);
 
+      // Ensure batchId is sent as string to maintain precision
       const shipmentData = {
-        batchId: selectedBatch, // Keep as string for BigInteger parsing
-        toAddress: distributor.walletAddress,
+        batchId: String(actualBatchId),
+        toAddress: distributor.walletAddress.trim(),
         quantity: parseInt(shipmentQuantity),
         trackingInfo: trackingInfo || `Shipment to ${distributor.name}`
       };
 
-      console.log('Creating shipment with data:', shipmentData);
+      console.log('=== SENDING REQUEST ===');
+      console.log('Shipment Data:', JSON.stringify(shipmentData, null, 2));
 
       const response = await manufacturerService.createShipment(shipmentData);
+
+      console.log('=== RESPONSE ===');
+      console.log('Response:', response);
 
       if (response.success) {
         setSuccess(`Tạo lô hàng thành công! 
@@ -139,8 +176,21 @@ const ShipmentManagement = () => {
         setError(response.message || 'Không thể tạo lô hàng');
       }
     } catch (err) {
-      console.error('Error creating shipment:', err);
-      setError('Lỗi tạo lô hàng: ' + err.message);
+      console.error('=== ERROR ===');
+      console.error('Error:', err);
+      console.error('Response Data:', err.response?.data);
+      
+      // Show more detailed error message
+      const errorMsg = err.response?.data?.message || err.message;
+      setError(`Lỗi: ${errorMsg}`);
+      
+      // If batch not found, show available batches
+      if (errorMsg.includes('Batch not found')) {
+        const availableIds = availableBatches.map(b => ({ batchId: b.batchId, type: typeof b.batchId }));
+        console.error('Available batch IDs:', availableIds);
+        console.error('Sent batchId:', actualBatchId, 'Type:', typeof actualBatchId);
+        setError(`${errorMsg}\n\nKiểm tra lại Batch ID. Có ${availableBatches.length} batches có sẵn.`);
+      }
     } finally {
       setCreating(false);
     }
@@ -395,13 +445,13 @@ const ShipmentManagement = () => {
                   onChange={(e) => setShipmentQuantity(e.target.value)}
                   className="form-control"
                   min="1"
-                  max={selectedBatch ? availableBatches.find(b => b.batchId == selectedBatch)?.quantity : undefined}
+                  max={selectedBatch ? availableBatches.find(b => String(b.batchId) === String(selectedBatch))?.quantity : undefined}
                   placeholder="Nhập số lượng"
                   required
                 />
                 {selectedBatch && (
                   <p className="form-help">
-                    Tối đa: {availableBatches.find(b => b.batchId == selectedBatch)?.quantity || 0} viên
+                    Tối đa: {availableBatches.find(b => String(b.batchId) === String(selectedBatch))?.quantity || 0} viên
                   </p>
                 )}
               </div>

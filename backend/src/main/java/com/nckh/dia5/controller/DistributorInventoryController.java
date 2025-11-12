@@ -35,7 +35,12 @@ public class DistributorInventoryController {
     public ResponseEntity<ApiResponse<List<DistributorInventory>>> getInventoryByWalletAddress(
             @PathVariable String walletAddress) {
         log.info("Getting inventory for wallet: {}", walletAddress);
-        List<DistributorInventory> inventory = inventoryService.getInventoryByWalletAddress(walletAddress);
+        
+        // ✅ FIX: Query từ drug_batches thay vì distributor_inventory
+        // Vì khi nhận hàng từ blockchain chỉ update drug_batches.current_owner
+        List<DistributorInventory> inventory = inventoryService.getInventoryByWalletAddressFromBatches(walletAddress);
+        
+        log.info("✅ Found {} items in inventory", inventory.size());
         return ResponseEntity.ok(ApiResponse.success(inventory, "Lấy danh sách kho thành công"));
     }
 

@@ -58,7 +58,9 @@ const BatchManagement = () => {
             }
 
             return {
-              id: (item.batchId?.toString?.() || item.batchNumber || item.id),
+              id: item.id, // Database ID for internal use
+              batchId: item.batchId?.toString?.(), // ⭐ Blockchain Batch ID - MÃ LÔ CHÍNH
+              batchNumber: item.batchNumber, // Batch number (VD: BT202511102252)
               drugName: item.drugName,
               manufacturer: item.manufacturer || item.manufacturerAddress || 'N/A',
               quantity: item.quantity,
@@ -281,8 +283,8 @@ const BatchManagement = () => {
                 <tr key={batch.id}>
                   <td>
                     <div className="batch-id">
-                      <strong>{batch.id}</strong>
-                      <span className="qr-code">{batch.qrCode}</span>
+                      <strong>{batch.batchId || batch.id}</strong>
+                      <span className="qr-code">{batch.batchNumber || batch.qrCode}</span>
                     </div>
                   </td>
                   <td>
@@ -318,7 +320,7 @@ const BatchManagement = () => {
                       </button>
                       <button
                         className="btn-icon btn-ship"
-                        onClick={() => handleCreateShipment(batch.id)}
+                        onClick={() => handleCreateShipment(batch.batchId || batch.id)}
                         title="Tạo shipment"
                         disabled={batch.availableQuantity === 0}
                       >

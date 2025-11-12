@@ -8,6 +8,11 @@ class StorageManager {
   setItem(key: string, value: any, type: StorageType = 'localStorage'): void {
     try {
       const storage = this.getStorage(type);
+      // Avoid saving undefined which becomes the string "undefined" and breaks JSON.parse
+      if (value === undefined) {
+        storage.removeItem(key);
+        return;
+      }
       storage.setItem(key, JSON.stringify(value));
     } catch (error) {
       console.error('Error setting storage item:', error);
@@ -18,9 +23,15 @@ class StorageManager {
     try {
       const storage = this.getStorage(type);
       const item = storage.getItem(key);
-      return item ? JSON.parse(item) : null;
+      
+      // ✅ Guard against invalid JSON strings
+      if (!item || item === 'undefined' || item === 'null' || item.trim() === '') {
+        return null;
+      }
+      
+      return JSON.parse(item);
     } catch (error) {
-      console.error('Error getting storage item:', error);
+      console.error('Error getting storage item:', key, error);
       return null;
     }
   }

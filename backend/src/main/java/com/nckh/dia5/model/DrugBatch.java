@@ -31,6 +31,7 @@ public class DrugBatch {
 
     @NotNull
     @Column(name = "batch_id", nullable = false, unique = true)
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     private BigInteger batchId;
 
     @NotNull
@@ -103,12 +104,14 @@ public class DrugBatch {
 
     // One-to-many relationship with shipments
     @OneToMany(mappedBy = "drugBatch", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "drugBatch"})
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<Shipment> shipments;
 
     // One-to-many relationship with blockchain transactions
     @OneToMany(mappedBy = "drugBatch", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<BlockchainTransaction> transactions;
 
     public enum BatchStatus {

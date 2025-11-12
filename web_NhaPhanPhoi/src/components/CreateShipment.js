@@ -18,6 +18,8 @@ import {
 import { distributorService } from '../services/apiService';
 import './CreateShipment.css';
 
+console.log('🔄 CreateShipment.js LOADED - Version 2.0');
+
 const CreateShipment = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -54,30 +56,64 @@ const CreateShipment = () => {
         console.log('Inventory response for CreateShipment:', inventoryResponse);
         
         if (inventoryResponse.success && inventoryResponse.data) {
-          console.log('All inventory from backend:', inventoryResponse.data);
-          console.log('Inventory quantities:', inventoryResponse.data.map(inv => ({ 
-            batchId: inv.blockchainBatchId, 
-            drugName: inv.drugName,
-            available: inv.availableQuantity,
-            total: inv.quantity 
-          })));
+          console.log('✅ All inventory from backend:', inventoryResponse.data);
+          console.log('📊 Array length:', inventoryResponse.data.length);
           
-          // Filter for items with available quantity > 0
+          // ✅ API /warehouse/exportable trả về DrugBatch objects
+          // Map fields từ DrugBatch sang format frontend cần
           const availableBatches = inventoryResponse.data
-            .filter(inv => inv.availableQuantity > 0)
-            .map(inv => ({
-              id: inv.blockchainBatchId?.toString() || inv.id,
-              drugName: inv.drugName,
-              manufacturer: inv.manufacturer || 'N/A',
-              availableQuantity: inv.availableQuantity,  // REAL available quantity from inventory
-              totalQuantity: inv.quantity,
-              expiryDate: inv.expiryDate ? inv.expiryDate.split(' ')[0] : '',
-              location: inv.warehouseLocation || 'Kho chính',
-              batchNumber: inv.batchNumber
-            }));
+            .filter(batch => {
+              // Filter: quantity > 0 VÀ chưa hết hạn
+              const hasQuantity = batch.quantity && batch.quantity > 0;
+              
+              // Check if expired
+              let isExpired = false;
+              if (batch.expiryDate) {
+                const expiryDate = new Date(batch.expiryDate);
+                isExpired = expiryDate < new Date();
+              }
+              
+              console.log(`🔍 Batch ${batch.batchId}: quantity=${batch.quantity}, hasQuantity=${hasQuantity}, isExpired=${isExpired}`);
+              
+              // ✅ CHỈ cho phép xuất kho nếu: có số lượng VÀ chưa hết hạn
+              return hasQuantity && !isExpired;
+            })
+            .map(batch => {
+              // ⭐ CRITICAL: ALWAYS use blockchain batch ID for consistency
+              const blockchainBatchId = batch.batchId;
+              const databaseId = batch.id;
+              
+              if (!blockchainBatchId) {
+                console.error('❌ CRITICAL: Batch missing blockchain batch ID!', batch);
+              }
+              
+              // Convert batchId to string để tránh vấn đề với số lớn
+              const batchIdStr = String(blockchainBatchId || databaseId);
+              
+              const mapped = {
+                id: batchIdStr, // ⭐ Use blockchain batch ID
+                batchId: blockchainBatchId, // ⭐ Keep original for reference
+                databaseId: databaseId, // Database ID for internal use only
+                drugName: batch.drugName,
+                manufacturer: batch.manufacturer || 'N/A',
+                availableQuantity: Number(batch.quantity),  // Ensure it's a number
+                totalQuantity: Number(batch.quantity),
+                expiryDate: batch.expiryDate ? batch.expiryDate.split('T')[0] : '',
+                location: 'Kho chính',
+                batchNumber: batch.batchNumber,
+                // Add expiry warning flag
+                isExpired: batch.expiryDate ? new Date(batch.expiryDate) < new Date() : false
+              };
+              
+              console.log('📦 Mapped batch - Blockchain ID:', blockchainBatchId, 'Database ID:', databaseId);
+              return mapped;
+            });
           
-          console.log('Filtered available inventory for shipment:', availableBatches);
+          console.log('✅ Final filtered batches for UI:', availableBatches);
+          console.log('📊 Final array length:', availableBatches.length);
           setBatches(availableBatches);
+        } else {
+          console.error('❌ Invalid response:', inventoryResponse);
         }
 
         // Fetch real pharmacies
@@ -86,9 +122,11 @@ const CreateShipment = () => {
           setPharmacies(pharmaciesResponse.data);
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
-        setBatches([]);
-        setPharmacies([]);
+        console.error('❌ Error fetching data:', error);
+        console.error('❌ Error details:', error.message, error.stack);
+        // Don't clear batches on error - keep existing data
+        // setBatches([]);
+        // setPharmacies([]);
       }
     };
 
@@ -159,7 +197,10 @@ const CreateShipment = () => {
 
   const handleBatchSelect = (batch) => {
     setSelectedBatch(batch);
-    handleInputChange('batchId', batch.id);
+    // ⭐ CRITICAL: Use blockchain batch ID, NOT database ID
+    const blockchainBatchId = batch.batchId || batch.id;
+    console.log('✅ Selected batch - Blockchain ID:', blockchainBatchId, 'Database ID:', batch.databaseId);
+    handleInputChange('batchId', blockchainBatchId);
   };
 
   const handlePharmacySelect = (pharmacy) => {
@@ -183,7 +224,7 @@ const CreateShipment = () => {
     try {
       // Prepare shipment data for API
       const shipmentData = {
-        batchId: formData.batchId,
+        batchId: formData.batchId, // ⭐ This should be blockchain batch ID
         pharmacyId: formData.pharmacyId,
         quantity: formData.quantity,
         trackingNumber: formData.trackingNumber,
@@ -193,10 +234,13 @@ const CreateShipment = () => {
         driverPhone: '' // Can be added to form later
       };
       
-      console.log('Creating shipment:', {
-        ...formData,
-        selectedBatch,
-        selectedPharmacy
+      console.log('🚀 Creating shipment with data:', {
+        batchId: formData.batchId,
+        batchIdType: typeof formData.batchId,
+        selectedBatchBlockchainId: selectedBatch?.batchId,
+        selectedBatchDatabaseId: selectedBatch?.databaseId,
+        pharmacyId: formData.pharmacyId,
+        quantity: formData.quantity
       });
 
       // Call actual API
@@ -211,16 +255,17 @@ const CreateShipment = () => {
           const inventoryResponse = await distributorService.getInventoryByWallet(ownerAddress);
           if (inventoryResponse.success && inventoryResponse.data) {
             const availableBatches = inventoryResponse.data
-              .filter(inv => inv.availableQuantity > 0)
-              .map(inv => ({
-                id: inv.blockchainBatchId?.toString() || inv.id,
-                drugName: inv.drugName,
-                manufacturer: inv.manufacturer || 'N/A',
-                availableQuantity: inv.availableQuantity,
-                totalQuantity: inv.quantity,
-                expiryDate: inv.expiryDate ? inv.expiryDate.split(' ')[0] : '',
-                location: inv.warehouseLocation || 'Kho chính',
-                batchNumber: inv.batchNumber
+              .filter(batch => batch.quantity && batch.quantity > 0)
+              .map(batch => ({
+                id: batch.batchId?.toString() || batch.id,
+                drugName: batch.drugName,
+                manufacturer: batch.manufacturer || 'N/A',
+                availableQuantity: batch.quantity,
+                totalQuantity: batch.quantity,
+                expiryDate: batch.expiryDate ? batch.expiryDate.split('T')[0] : '',
+                location: 'Kho chính',
+                batchNumber: batch.batchNumber,
+                isExpired: batch.expiryDate ? new Date(batch.expiryDate) < new Date() : false
               }));
             setBatches(availableBatches);
           }
@@ -275,6 +320,9 @@ const CreateShipment = () => {
     </div>
   );
 
+  // Debug log for render
+  console.log('🎨 CreateShipment render - batches:', batches, 'length:', batches.length);
+
   return (
     <div className="create-shipment">
       {/* Header */}
@@ -300,27 +348,41 @@ const CreateShipment = () => {
               </div>
 
               <div className="batch-grid">
-                {batches.map((batch) => (
-                  <div
-                    key={batch.id}
-                    className={`batch-card ${selectedBatch?.id === batch.id ? 'selected' : ''}`}
-                    onClick={() => handleBatchSelect(batch)}
-                  >
-                    <div className="batch-header">
-                      <strong>{batch.drugName}</strong>
-                      <span className="batch-id">{batch.id}</span>
-                    </div>
-                    <div className="batch-details">
-                      <p>Nhà sản xuất: {batch.manufacturer}</p>
-                      <p>Vị trí: {batch.location}</p>
-                      <p>Hết hạn: {batch.expiryDate}</p>
-                    </div>
-                    <div className="batch-quantity">
-                      <span className="available">{batch.availableQuantity}</span>
-                      <span className="total">/ {batch.totalQuantity} viên</span>
-                    </div>
+                {batches.length === 0 ? (
+                  <div style={{padding: '20px', textAlign: 'center', color: '#64748b'}}>
+                    Không có lô hàng nào có sẵn. Vui lòng kiểm tra kho hàng.
                   </div>
-                ))}
+                ) : (
+                  batches.map((batch) => (
+                    <div
+                      key={batch.id}
+                      className={`batch-card ${selectedBatch?.id === batch.id ? 'selected' : ''} ${batch.isExpired ? 'expired' : ''}`}
+                      onClick={() => handleBatchSelect(batch)}
+                    >
+                      {batch.isExpired && (
+                        <div className="expired-badge">
+                          <AlertCircle size={14} />
+                          <span>ĐÃ HẾT HẠN</span>
+                        </div>
+                      )}
+                      <div className="batch-header">
+                        <strong>{batch.drugName}</strong>
+                        <span className="batch-id">{batch.batchId || batch.id}</span>
+                      </div>
+                      <div className="batch-details">
+                        <p>Nhà sản xuất: {batch.manufacturer}</p>
+                        <p>Vị trí: {batch.location}</p>
+                        <p className={batch.isExpired ? 'expired-text' : ''}>
+                          Hết hạn: {batch.expiryDate}
+                        </p>
+                      </div>
+                      <div className="batch-quantity">
+                        <span className="available">{batch.availableQuantity}</span>
+                        <span className="total">/ {batch.totalQuantity} viên</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
 
               {errors.batchId && (
@@ -461,8 +523,12 @@ const CreateShipment = () => {
                 <h3>Thông tin lô hàng</h3>
                 <div className="summary-card">
                   <div className="summary-item">
-                    <label>Mã lô:</label>
-                    <span>{selectedBatch?.id}</span>
+                    <label>Mã lô (Blockchain):</label>
+                    <span className="blockchain-id">{selectedBatch?.batchId || selectedBatch?.id}</span>
+                  </div>
+                  <div className="summary-item">
+                    <label>Batch Number:</label>
+                    <span>{selectedBatch?.batchNumber}</span>
                   </div>
                   <div className="summary-item">
                     <label>Tên thuốc:</label>

@@ -17,8 +17,13 @@ export function AuthProvider({ children }) {
     // Check if user is logged in (from localStorage)
     const storedUser = localStorage.getItem('pharmacy_user');
     const storedToken = localStorage.getItem('pharmacy_token');
-    if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
+    if (storedUser && storedToken && storedUser !== 'undefined' && storedUser !== 'null' && storedUser.trim() !== '') {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.warn('Invalid pharmacy_user JSON in storage, clearing');
+        localStorage.removeItem('pharmacy_user');
+      }
     }
     setLoading(false);
   }, []);

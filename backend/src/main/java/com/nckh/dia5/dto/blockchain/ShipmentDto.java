@@ -1,6 +1,8 @@
 package com.nckh.dia5.dto.blockchain;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,6 +27,7 @@ public class ShipmentDto {
     private String shipmentCode;
 
     @NotNull(message = "Shipment ID không được để trống")
+    @JsonSerialize(using = ToStringSerializer.class)
     private BigInteger shipmentId;
 
     @NotNull(message = "Địa chỉ gửi không được để trống")
@@ -52,6 +55,7 @@ public class ShipmentDto {
     @Size(max = 66, message = "Hash giao dịch không được vượt quá 66 ký tự")
     private String transactionHash;
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private BigInteger blockNumber;
 
     private Boolean isSynced;

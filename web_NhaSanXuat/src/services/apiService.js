@@ -68,26 +68,44 @@ const blockchainAPI = {
       drugName: batchData.productName,
       manufacturer: batchData.manufacturer,
       batchNumber: batchData.id,
-      quantity: parseInt(batchData.quantity),
+      quantity: parseInt(batchData.quantity) || 0,
       expiryDate: formatExpiryDate(batchData.expiryDate),
       storageConditions: batchData.storageConditions || 'Bảo quản ở nhiệt độ phòng'
     };
     
+    // Debug log
     console.log('Creating batch with payload:', payload);
-    return await apiClient.post('/blockchain/drugs/batches', payload);
+    try {
+      const response = await apiClient.post('/blockchain/drugs/batches', payload);
+      return response;
+    } catch (error) {
+      console.error('Batch creation error details:', error.response?.data);
+      throw error;
+    }
   },
 
   // Create shipment -> POST /api/blockchain/drugs/shipments
   createShipment: async (shipmentData) => {
     console.log('API Service - Creating shipment with data:', shipmentData);
+    
+    // Prepare payload for CreateShipmentRequest
     const payload = {
-      batchId: String(shipmentData.batchId), // Ensure it's a string for BigInteger parsing
+      batchId: String(shipmentData.batchId), // BigInteger as string
       toAddress: String(shipmentData.toAddress || shipmentData.pharmacyAddress),
-      quantity: Number(shipmentData.quantity),
-      trackingInfo: shipmentData.trackingInfo || undefined
+      quantity: parseInt(shipmentData.quantity),
+      trackingInfo: shipmentData.trackingInfo || `Shipment for batch ${shipmentData.batchId}`
     };
-    console.log('API Service - Sending payload:', payload);
-    return await apiClient.post('/blockchain/drugs/shipments', payload);
+    
+    console.log('API Service - Sending payload to /blockchain/drugs/shipments:', payload);
+    
+    try {
+      const response = await apiClient.post('/blockchain/drugs/shipments', payload);
+      console.log('API Service - Response:', response);
+      return response;
+    } catch (error) {
+      console.error('API Service - Error details:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   // Get batch details -> GET /api/blockchain/drugs/batches/{batchId}

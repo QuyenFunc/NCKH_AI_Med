@@ -9,6 +9,7 @@ import ShipmentManagement from './components/ShipmentManagement';
 import Reports from './components/Reports';
 import AccountManagement from './components/AccountManagement';
 import LoginScreen from './components/auth/LoginScreen';
+import BatchProductManagement from './components/BatchProductManagement';
 
 // Auth wrapper component
 function AuthWrapper() {
@@ -36,6 +37,7 @@ function AuthWrapper() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/products" element={<ProductManagement />} />
         <Route path="/batch-allocation" element={<BatchAllocation />} />
+        <Route path="/batch-products" element={<BatchProductManagement />} />
         <Route path="/shipments" element={<ShipmentManagement />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/account" element={<AccountManagement />} />

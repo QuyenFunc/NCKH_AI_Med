@@ -149,7 +149,7 @@ public class PharmacyInventoryService {
      */
     @Transactional
     public PharmacyInventory receiveShipment(Long pharmacyId, Long batchId, Integer quantity, Shipment shipment) {
-        log.info("Receiving shipment to pharmacy inventory: pharmacyId={}, batchId={}, quantity={}", 
+        log.info("📦 Receiving shipment to pharmacy inventory: pharmacyId={}, batchId={}, quantity={}", 
                 pharmacyId, batchId, quantity);
 
         // Get pharmacy
@@ -160,6 +160,12 @@ public class PharmacyInventoryService {
         DrugBatch batch = drugBatchRepository.findById(batchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", batchId.toString()));
 
+        // ✅ LOG BATCH INFO TO VERIFY CONSISTENCY
+        log.info("✅ Batch Info - Database ID: {}, Blockchain Batch ID: {}, Batch Number: {}", 
+                batch.getId(), 
+                batch.getBatchId(), 
+                batch.getBatchNumber());
+
         // Check if inventory record exists
         PharmacyInventory inventory = inventoryRepository
                 .findByPharmacyIdAndDrugBatchId(pharmacyId, batchId)
@@ -167,14 +173,15 @@ public class PharmacyInventoryService {
 
         if (inventory != null) {
             // Update existing inventory
-            log.info("Updating existing inventory record: id={}", inventory.getId());
+            log.info("📝 Updating existing inventory record: id={}, blockchain_batch_id={}", 
+                    inventory.getId(), inventory.getBlockchainBatchId());
             inventory.setQuantity(inventory.getQuantity() + quantity);
             inventory.setReceivedShipment(shipment);
             inventory.setReceivedDate(LocalDateTime.now());
             inventory.setUpdatedAt(LocalDateTime.now());
         } else {
             // Create new inventory record
-            log.info("Creating new inventory record for pharmacy");
+            log.info("✨ Creating new inventory record for pharmacy");
             inventory = new PharmacyInventory();
             inventory.setPharmacy(pharmacy);
             inventory.setDrugBatch(batch);
@@ -185,13 +192,18 @@ public class PharmacyInventoryService {
             inventory.setManufactureDate(batch.getManufactureTimestamp());
             inventory.setExpiryDate(batch.getExpiryDate());
             inventory.setQrCode(batch.getQrCode());
+            
+            // ⭐ CRITICAL: Use blockchain batch ID for traceability
             inventory.setBlockchainBatchId(batch.getBatchId());
+            
             inventory.setCurrentOwnerAddress(pharmacy.getWalletAddress());
             inventory.setReceivedFromDistributor(shipment.getFromCompany());
             inventory.setReceivedShipment(shipment);
             inventory.setReceivedDate(LocalDateTime.now());
             inventory.setReceivedQuantity(quantity);
             inventory.setIsVerified(true);
+            
+            log.info("✅ Inventory created with Blockchain Batch ID: {}", batch.getBatchId());
         }
 
         return inventoryRepository.save(inventory);

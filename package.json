@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "A new Flutter project.",
   "main": "cors-proxy.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "directories": {
     "lib": "lib",
     "test": "test"
@@ -17,5 +20,8 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "http-proxy-middleware": "^3.0.5"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-verify": "^2.0.10"
   }
 }

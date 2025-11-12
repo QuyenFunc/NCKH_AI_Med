@@ -47,11 +47,14 @@ const Dashboard = () => {
             categoryStats[item.category] += item.currentStock;
           });
           
-          const inventoryData = Object.entries(categoryStats).map(([category, quantity], index) => ({
-            category,
-            quantity,
-            color: ['#3498db', '#27ae60', '#f39c12', '#e74c3c', '#9b59b6', '#95a5a6'][index % 6]
-          }));
+          const inventoryData = Object.entries(categoryStats).map(([category, qty], index) => {
+            const quantity = Number.isFinite(qty) ? qty : parseFloat(qty) || 0;
+            return {
+              category,
+              quantity,
+              color: ['#3498db', '#27ae60', '#f39c12', '#e74c3c', '#9b59b6', '#95a5a6'][index % 6]
+            };
+          });
           
           setInventoryData(inventoryData);
         } else {
@@ -210,6 +213,7 @@ const Dashboard = () => {
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
+                {(Array.isArray(inventoryData) && inventoryData.length > 0) && (
                 <Pie
                   data={inventoryData || []}
                   cx="50%"
@@ -225,6 +229,7 @@ const Dashboard = () => {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
+                )}
                 <Tooltip formatter={(value) => [value.toLocaleString() + ' viên', 'Tồn kho']} />
               </PieChart>
             </ResponsiveContainer>

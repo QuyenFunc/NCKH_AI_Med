@@ -91,42 +91,59 @@ export const pharmacyService = {
       }
       
       // Transform pharmacy inventory to frontend format
-      const inventory = inventoryData.map(item => ({
-          id: item.id,
-          name: item.drugName,
-          batchCode: item.batchNumber,
-          category: getCategoryFromDrugName(item.drugName),
-          manufacturer: item.manufacturer || 'N/A',
-          currentStock: item.quantity,
-          availableQuantity: item.availableQuantity,
-          reservedQuantity: item.reservedQuantity,
-          soldQuantity: item.soldQuantity,
-          minStock: item.minStockLevel || 20,
-          maxStock: item.maxStockLevel || 500,
-          unitPrice: item.costPrice || getEstimatedPrice(item.drugName),
-          retailPrice: item.retailPrice || 0,
-          totalValue: item.totalValue || 0,
-          profitMargin: item.profitMargin || 0,
-          expiryDate: item.expiryDate ? item.expiryDate.split('T')[0] : '',
-          manufactureDate: item.manufactureDate ? item.manufactureDate.split('T')[0] : '',
-          location: item.shelfLocation || 'Kệ chính',
-          lastUpdated: item.updatedAt || item.createdAt,
-          status: item.status ? item.status.toLowerCase() : 'in_stock',
-          storageConditions: item.storageConditions || 'Nơi khô ráo, tránh ánh sáng',
-          batchNumber: item.batchNumber,
-          qrCode: item.qrCode,
-          isVerified: item.isVerified,
-          isFeatured: item.isFeatured,
-          isOnSale: item.isOnSale,
-          requiresPrescription: item.requiresPrescription,
-          // Additional pharmacy-specific fields
-          receivedDate: item.receivedDate,
-          receivedQuantity: item.receivedQuantity,
-          firstSaleDate: item.firstSaleDate,
-          lastSaleDate: item.lastSaleDate,
-          averageDailySales: item.averageDailySales,
-          daysOfSupply: item.daysOfSupply
-        }));
+      const inventory = inventoryData.map(raw => {
+          const toNumber = (v, fallback = 0) => {
+            const n = typeof v === 'number' ? v : parseFloat(v);
+            return Number.isFinite(n) ? n : fallback;
+          };
+          const item = raw || {};
+          const quantity = toNumber(item.quantity);
+          const availableQuantity = toNumber(item.availableQuantity);
+          const reservedQuantity = toNumber(item.reservedQuantity);
+          const soldQuantity = toNumber(item.soldQuantity);
+          const minStock = toNumber(item.minStockLevel, 20);
+          const maxStock = toNumber(item.maxStockLevel, 500);
+          const unitPrice = toNumber(item.costPrice, getEstimatedPrice(item.drugName));
+          const retailPrice = toNumber(item.retailPrice);
+          const totalValue = toNumber(item.totalValue, quantity * unitPrice);
+          const profitMargin = toNumber(item.profitMargin);
+          return {
+            id: item.id,
+            name: item.drugName,
+            batchCode: item.batchNumber,
+            category: getCategoryFromDrugName(item.drugName),
+            manufacturer: item.manufacturer || 'N/A',
+            currentStock: quantity,
+            availableQuantity,
+            reservedQuantity,
+            soldQuantity,
+            minStock,
+            maxStock,
+            unitPrice,
+            retailPrice,
+            totalValue,
+            profitMargin,
+            expiryDate: item.expiryDate ? String(item.expiryDate).split('T')[0] : '',
+            manufactureDate: item.manufactureDate ? String(item.manufactureDate).split('T')[0] : '',
+            location: item.shelfLocation || 'Kệ chính',
+            lastUpdated: item.updatedAt || item.createdAt,
+            status: item.status ? String(item.status).toLowerCase() : 'in_stock',
+            storageConditions: item.storageConditions || 'Nơi khô ráo, tránh ánh sáng',
+            batchNumber: item.batchNumber,
+            qrCode: item.qrCode,
+            isVerified: !!item.isVerified,
+            isFeatured: !!item.isFeatured,
+            isOnSale: !!item.isOnSale,
+            requiresPrescription: !!item.requiresPrescription,
+            // Additional pharmacy-specific fields
+            receivedDate: item.receivedDate,
+            receivedQuantity: toNumber(item.receivedQuantity),
+            firstSaleDate: item.firstSaleDate,
+            lastSaleDate: item.lastSaleDate,
+            averageDailySales: toNumber(item.averageDailySales),
+            daysOfSupply: toNumber(item.daysOfSupply)
+          };
+        });
       return { success: true, data: inventory };
     } catch (error) {
       console.error('Failed to get inventory:', error);
@@ -325,12 +342,18 @@ export const pharmacyService = {
   getPendingShipments: async () => {
     try {
       // Get current user's wallet address
-      const userData = localStorage.getItem('user');
+      const userData = localStorage.getItem('pharmacy_user');
       if (!userData) {
         throw new Error('User not authenticated');
       }
       
-      const user = JSON.parse(userData);
+      let user;
+      try {
+        user = JSON.parse(userData);
+      } catch (e) {
+        console.warn('Invalid pharmacy_user JSON');
+        throw new Error('User not authenticated');
+      }
       if (!user.walletAddress) {
         throw new Error('User wallet address not found');
       }

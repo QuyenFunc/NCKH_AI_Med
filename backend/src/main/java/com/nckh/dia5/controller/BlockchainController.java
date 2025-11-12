@@ -2,9 +2,12 @@ package com.nckh.dia5.controller;
 
 import com.nckh.dia5.dto.common.ApiResponse;
 import com.nckh.dia5.service.BlockchainService;
+import com.nckh.dia5.service.ProductItemService;
+import com.nckh.dia5.service.DrugTraceabilityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
@@ -20,6 +23,8 @@ import java.util.Optional;
 public class BlockchainController {
 
     private final BlockchainService blockchainService;
+    private final ProductItemService productItemService;
+    private final DrugTraceabilityService drugTraceabilityService;
 
     @GetMapping("/status")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getBlockchainStatus() {
@@ -121,6 +126,72 @@ public class BlockchainController {
         } catch (Exception e) {
             log.error("Failed to get latest block", e);
             return ResponseEntity.ok(ApiResponse.error("Lỗi khi lấy thông tin block: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/manufacturer/stats")
+    @PreAuthorize("hasRole('MANUFACTURER')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getManufacturerStats() {
+        try {
+            log.info("Getting manufacturer blockchain statistics");
+            
+            Map<String, Object> stats = new HashMap<>();
+            
+            // Get blockchain status
+            try {
+                BigInteger latestBlock = blockchainService.getLatestBlockNumber();
+                stats.put("blockchainConnected", true);
+                stats.put("latestBlock", latestBlock);
+            } catch (Exception e) {
+                stats.put("blockchainConnected", false);
+                stats.put("blockchainError", e.getMessage());
+            }
+            
+            // Get product item statistics
+            try {
+                // Count total items
+                long totalItems = productItemService.countAllItems();
+                long blockchainSyncedItems = productItemService.countBlockchainSyncedItems();
+                long pendingSyncItems = totalItems - blockchainSyncedItems;
+                
+                stats.put("totalProductItems", totalItems);
+                stats.put("blockchainSyncedItems", blockchainSyncedItems);
+                stats.put("pendingSyncItems", pendingSyncItems);
+                stats.put("syncRate", totalItems > 0 ? (double) blockchainSyncedItems / totalItems : 0.0);
+                
+                // Count by status
+                Map<String, Long> statusCounts = productItemService.getStatusCounts();
+                stats.put("statusCounts", statusCounts);
+                
+            } catch (Exception e) {
+                log.warn("Failed to get product item statistics: {}", e.getMessage());
+                stats.put("productItemError", e.getMessage());
+            }
+            
+            // Get batch statistics
+            try {
+                var allBatches = drugTraceabilityService.getAllBatches();
+                long totalBatches = allBatches.size();
+                long activeBatches = allBatches.stream()
+                    .filter(batch -> !"EXPIRED".equals(batch.getStatus()) && !"CONSUMED".equals(batch.getStatus()))
+                    .count();
+                
+                stats.put("totalBatches", totalBatches);
+                stats.put("activeBatches", activeBatches);
+                
+            } catch (Exception e) {
+                log.warn("Failed to get batch statistics: {}", e.getMessage());
+                stats.put("batchError", e.getMessage());
+            }
+            
+            // Add timestamp
+            stats.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(ApiResponse.success(stats, "Lấy thống kê manufacturer thành công"));
+            
+        } catch (Exception e) {
+            log.error("Failed to get manufacturer stats", e);
+            return ResponseEntity.ok(ApiResponse.error("Lỗi khi lấy thống kê manufacturer: " + e.getMessage()));
         }
     }
 }

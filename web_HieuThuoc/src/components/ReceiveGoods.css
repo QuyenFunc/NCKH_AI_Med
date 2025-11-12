@@ -49,6 +49,9 @@
   background-color: #f0fdf4;
   color: #166534;
   border: 1px solid #bbf7d0;
+  white-space: pre-line;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
 }
 
 /* Scanner Section */
@@ -305,6 +308,26 @@
   color: #166534;
 }
 
+.status-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-in_transit {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.status-delivered {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-canceled, .status-cancelled {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
 /* Notes and Blockchain Info */
 .notes-content, .blockchain-note {
   display: flex;
@@ -473,6 +496,59 @@
 .source-badge.distributor {
   background-color: #dbeafe;
   color: #1e40af;
+}
+
+.batch-info {
+  font-size: 0.875rem;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: #eff6ff;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+}
+
+.batch-info strong {
+  color: #1e40af;
+  margin-right: 0.5rem;
+}
+
+.batch-id-section {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 2px solid #3b82f6;
+  border-radius: 12px;
+  padding: 1.5rem !important;
+}
+
+.batch-id-display {
+  text-align: center;
+}
+
+.batch-id-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1e40af;
+  font-family: 'Courier New', monospace;
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  border: 2px solid #3b82f6;
+  word-break: break-all;
+}
+
+.batch-number-value {
+  font-size: 1rem;
+  color: #374151;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.batch-id-note {
+  font-size: 0.875rem;
+  color: #1e40af;
+  margin: 0;
+  font-style: italic;
 }
 
 .expected-date, .products-count, .total-value {

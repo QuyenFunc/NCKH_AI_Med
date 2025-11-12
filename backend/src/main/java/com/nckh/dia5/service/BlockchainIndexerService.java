@@ -40,8 +40,14 @@ public class BlockchainIndexerService {
     private final BlockchainEventRepository eventRepository;
     private final ObjectMapper objectMapper;
 
-    @Value("${pharmaledger.contract.address:0x5FbDB2315678afecb367f032d93F642f64180aa3}")
+    @Value("${pharmaledger.contract.address:0xc6e7DF5E7b4f2A278906862b61205850344D4e7d}")
     private String contractAddress;
+
+    @Value("${pharmaledger.blockchain.safety-buffer:2}")
+    private int safetyBuffer;
+
+    @Value("${blockscout.api.url:http://localhost:3000/api}")
+    private String blockscoutApiUrl;
 
     // Event signatures
     private static final Event BATCH_ISSUED_EVENT = new Event("BatchIssued",
@@ -74,6 +80,7 @@ public class BlockchainIndexerService {
 
     /**
      * Index blockchain events từ block cũ nhất chưa được index
+     * With Blockscout sync validation
      */
     @Scheduled(fixedDelay = 30000) // Chạy mỗi 30 giây
     @Async
@@ -85,19 +92,35 @@ public class BlockchainIndexerService {
             BigInteger lastIndexedBlock = eventRepository.findMaxBlockNumber()
                 .orElse(BigInteger.ZERO);
 
-            // Lấy block number hiện tại
+            // Lấy block number hiện tại từ blockchain
             BigInteger currentBlock = web3j.ethBlockNumber().send().getBlockNumber();
+            BigInteger configuredBuffer = getConfiguredBuffer();
+            BigInteger safeCurrentBlock = applySafetyBuffer(currentBlock, configuredBuffer);
 
-            if (currentBlock.compareTo(lastIndexedBlock) <= 0) {
-                log.debug("No new blocks to index. Current: {}, Last indexed: {}", 
-                    currentBlock, lastIndexedBlock);
+            // Validate block exists before indexing
+            if (!validateBlockExists(safeCurrentBlock)) {
+                log.warn("⚠️ Target block {} not yet available on blockchain, skipping indexing", safeCurrentBlock);
+                return;
+            }
+
+            if (safeCurrentBlock.compareTo(lastIndexedBlock) <= 0) {
+                log.debug("No new blocks to index. Safe current: {}, last indexed: {}, buffer: {}",
+                    safeCurrentBlock, lastIndexedBlock, configuredBuffer);
                 return;
             }
 
             BigInteger fromBlock = lastIndexedBlock.add(BigInteger.ONE);
-            BigInteger toBlock = currentBlock;
+            BigInteger toBlock = safeCurrentBlock;
 
-            log.info("📊 Indexing events from block {} to {}", fromBlock, toBlock);
+            if (toBlock.compareTo(fromBlock) < 0) {
+                log.debug("Safety buffer leaves no range to index (from: {}, to: {}, buffer: {})",
+                    fromBlock, toBlock, configuredBuffer);
+                return;
+            }
+
+            log.info("📊 Indexing events from block {} to {} (current: {}, buffer: {})",
+                fromBlock, toBlock, currentBlock, configuredBuffer);
+            log.info("   Blockscout should have indexed these blocks by now");
 
             // Index từng loại event
             indexBatchIssuedEvents(fromBlock, toBlock);
@@ -109,6 +132,30 @@ public class BlockchainIndexerService {
 
         } catch (Exception e) {
             log.error("❌ Failed to index blockchain events: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Validate that a block exists on the blockchain
+     */
+    private boolean validateBlockExists(BigInteger blockNumber) {
+        try {
+            if (blockNumber.compareTo(BigInteger.ZERO) < 0) {
+                return false;
+            }
+            
+            org.web3j.protocol.core.methods.response.EthBlock ethBlock = web3j.ethGetBlockByNumber(
+                new DefaultBlockParameterNumber(blockNumber), false).send();
+            
+            boolean exists = ethBlock.getBlock() != null;
+            if (!exists) {
+                log.warn("Block {} does not exist yet", blockNumber);
+            }
+            return exists;
+            
+        } catch (Exception e) {
+            log.error("Failed to validate block existence: {}", e.getMessage());
+            return false;
         }
     }
 
@@ -266,10 +313,21 @@ public class BlockchainIndexerService {
             log.info("🔄 Manual indexing from block: {}", fromBlock);
             
             BigInteger currentBlock = web3j.ethBlockNumber().send().getBlockNumber();
+            BigInteger configuredBuffer = getConfiguredBuffer();
+            BigInteger safeCurrentBlock = applySafetyBuffer(currentBlock, configuredBuffer);
             
-            indexBatchIssuedEvents(fromBlock, currentBlock);
-            indexShipmentCreatedEvents(fromBlock, currentBlock);
-            indexShipmentReceivedEvents(fromBlock, currentBlock);
+            if (safeCurrentBlock.compareTo(fromBlock) < 0) {
+                log.warn("Current safe block {} is less than from block {} (buffer: {}). Skipping indexing.",
+                    safeCurrentBlock, fromBlock, configuredBuffer);
+                return;
+            }
+            
+            log.info("📊 Manual indexing from {} to {} (current: {}, buffer: {})", 
+                fromBlock, safeCurrentBlock, currentBlock, configuredBuffer);
+            
+            indexBatchIssuedEvents(fromBlock, safeCurrentBlock);
+            indexShipmentCreatedEvents(fromBlock, safeCurrentBlock);
+            indexShipmentReceivedEvents(fromBlock, safeCurrentBlock);
             
             log.info("✅ Manual indexing completed");
         } catch (Exception e) {
@@ -294,12 +352,25 @@ public class BlockchainIndexerService {
             status.put("blocksBehind", currentBlock.subtract(lastIndexedBlock));
             status.put("unprocessedEvents", unprocessedEvents);
             status.put("isUpToDate", currentBlock.equals(lastIndexedBlock));
+            status.put("safetyBuffer", getConfiguredBuffer());
             
             return status;
         } catch (Exception e) {
             log.error("❌ Failed to get indexing status: {}", e.getMessage());
             throw new RuntimeException("Failed to get indexing status", e);
         }
+    }
+
+    private BigInteger getConfiguredBuffer() {
+        return BigInteger.valueOf(Math.max(0, safetyBuffer));
+    }
+
+    private BigInteger applySafetyBuffer(BigInteger currentBlock, BigInteger buffer) {
+        BigInteger safeCurrentBlock = currentBlock.subtract(buffer);
+        if (safeCurrentBlock.compareTo(BigInteger.ZERO) < 0) {
+            return BigInteger.ZERO;
+        }
+        return safeCurrentBlock;
     }
 
     // Helper methods để parse log data

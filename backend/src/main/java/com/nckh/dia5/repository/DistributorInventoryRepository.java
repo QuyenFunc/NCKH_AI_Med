@@ -40,4 +40,7 @@ public interface DistributorInventoryRepository extends JpaRepository<Distributo
     // Get total inventory value for distributor
     @Query("SELECT COALESCE(SUM(di.totalValue), 0) FROM DistributorInventory di WHERE di.distributor.id = :distributorId")
     Double getTotalInventoryValue(@Param("distributorId") Long distributorId);
+
+    // Find by drug batch ID (for batch consistency check)
+    List<DistributorInventory> findByDrugBatchId(Long batchId);
 }

@@ -59,8 +59,11 @@ dependencies:
   # For MySQL database connection (through REST API)
   json_annotation: ^4.9.0
   
-  # For QR code scanning - drug verification
-  qr_code_scanner: ^1.0.1
+  # For QR code scanning - drug verification (mobile_scanner is more maintained)
+  mobile_scanner: ^5.2.3
+  
+  # For timeline UI in verification result
+  timeline_tile: ^2.0.0
   
   # For permission handling
   permission_handler: ^11.3.1

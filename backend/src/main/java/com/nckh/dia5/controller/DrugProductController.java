@@ -109,39 +109,92 @@ public class DrugProductController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<DrugProduct>> update(@PathVariable Long id, @RequestBody DrugProduct product) {
-        ManufacturerUser current = manufacturerAuthService.getCurrentUser();
-        if (current == null) {
-            return ResponseEntity.status(401).body(ApiResponse.error("Chưa đăng nhập", 401));
+        try {
+            log.info("Updating product ID: {}", id);
+            
+            ManufacturerUser current = manufacturerAuthService.getCurrentUser();
+            if (current == null) {
+                log.warn("Unauthorized update attempt");
+                return ResponseEntity.status(401).body(ApiResponse.error("Chưa đăng nhập", 401));
+            }
+            
+            // Find the product by ID first
+            return drugProductRepository.findById(id)
+                    .map(existing -> {
+                        // Verify ownership by checking manufacturerId
+                        Long currentManufacturerId = ensurePharmaCompanyExists(current);
+                        
+                        if (existing.getManufacturerId() != null && 
+                            !existing.getManufacturerId().equals(currentManufacturerId)) {
+                            log.warn("User {} attempted to update product {} owned by different manufacturer", 
+                                     current.getId(), id);
+                            return ResponseEntity.status(403)
+                                    .<ApiResponse<DrugProduct>>body(ApiResponse.error("Không có quyền cập nhật sản phẩm này", 403));
+                        }
+                        
+                        // Update fields
+                        if (product.getName() != null) existing.setName(product.getName());
+                        if (product.getActiveIngredient() != null) existing.setActiveIngredient(product.getActiveIngredient());
+                        if (product.getDosage() != null) existing.setDosage(product.getDosage());
+                        if (product.getUnit() != null) existing.setUnit(product.getUnit());
+                        if (product.getCategory() != null) existing.setCategory(product.getCategory());
+                        if (product.getDescription() != null) existing.setDescription(product.getDescription());
+                        if (product.getStorageConditions() != null) existing.setStorageConditions(product.getStorageConditions());
+                        if (product.getShelfLife() != null) existing.setShelfLife(product.getShelfLife());
+                        if (product.getStatus() != null) existing.setStatus(product.getStatus());
+                        
+                        DrugProduct updated = drugProductRepository.save(existing);
+                        log.info("Product updated successfully: {} (ID: {})", updated.getName(), updated.getId());
+                        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật sản phẩm thành công"));
+                    })
+                    .orElseGet(() -> {
+                        log.warn("Product not found: {}", id);
+                        return ResponseEntity.status(404).body(ApiResponse.error("Không tìm thấy sản phẩm", 404));
+                    });
+                    
+        } catch (Exception e) {
+            log.error("Error updating product: ", e);
+            return ResponseEntity.status(500).body(ApiResponse.error("Lỗi server: " + e.getMessage(), 500));
         }
-        return drugProductRepository.findByIdAndManufacturerId(id, convertUserIdToManufacturerId(current.getId()))
-                .map(existing -> {
-                    existing.setName(product.getName());
-                    existing.setActiveIngredient(product.getActiveIngredient());
-                    existing.setDosage(product.getDosage());
-                    existing.setUnit(product.getUnit());
-                    existing.setCategory(product.getCategory());
-                    existing.setDescription(product.getDescription());
-                    existing.setStorageConditions(product.getStorageConditions());
-                    existing.setShelfLife(product.getShelfLife());
-                    existing.setStatus(product.getStatus());
-                    DrugProduct updated = drugProductRepository.save(existing);
-                    return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật sản phẩm thành công"));
-                })
-                .orElseGet(() -> ResponseEntity.status(404).body(ApiResponse.error("Không tìm thấy sản phẩm", 404)));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable Long id) {
-        ManufacturerUser current = manufacturerAuthService.getCurrentUser();
-        if (current == null) {
-            return ResponseEntity.status(401).body(ApiResponse.error("Chưa đăng nhập", 401));
+        try {
+            log.info("Deleting product ID: {}", id);
+            
+            ManufacturerUser current = manufacturerAuthService.getCurrentUser();
+            if (current == null) {
+                log.warn("Unauthorized delete attempt");
+                return ResponseEntity.status(401).body(ApiResponse.error("Chưa đăng nhập", 401));
+            }
+            
+            return drugProductRepository.findById(id)
+                    .map(existing -> {
+                        // Verify ownership
+                        Long currentManufacturerId = ensurePharmaCompanyExists(current);
+                        
+                        if (existing.getManufacturerId() != null && 
+                            !existing.getManufacturerId().equals(currentManufacturerId)) {
+                            log.warn("User {} attempted to delete product {} owned by different manufacturer", 
+                                     current.getId(), id);
+                            return ResponseEntity.status(403)
+                                    .<ApiResponse<String>>body(ApiResponse.error("Không có quyền xóa sản phẩm này", 403));
+                        }
+                        
+                        drugProductRepository.delete(existing);
+                        log.info("Product deleted successfully: {}", id);
+                        return ResponseEntity.ok(ApiResponse.success("", "Xóa sản phẩm thành công"));
+                    })
+                    .orElseGet(() -> {
+                        log.warn("Product not found: {}", id);
+                        return ResponseEntity.status(404).body(ApiResponse.error("Không tìm thấy sản phẩm", 404));
+                    });
+                    
+        } catch (Exception e) {
+            log.error("Error deleting product: ", e);
+            return ResponseEntity.status(500).body(ApiResponse.error("Lỗi server: " + e.getMessage(), 500));
         }
-        return drugProductRepository.findByIdAndManufacturerId(id, convertUserIdToManufacturerId(current.getId()))
-                .map(existing -> {
-                    drugProductRepository.delete(existing);
-                    return ResponseEntity.ok(ApiResponse.success("", "Xóa sản phẩm thành công"));
-                })
-                .orElseGet(() -> ResponseEntity.status(404).body(ApiResponse.error("Không tìm thấy sản phẩm", 404)));
     }
 
     @GetMapping("/debug/all")
@@ -160,42 +213,47 @@ public class DrugProductController {
     }
     
     /**
-     * Convert ManufacturerUser.id (String UUID) to Long manufacturerId
-     * Uses hashCode to generate a consistent Long value
-     */
-    private Long convertUserIdToManufacturerId(String userId) {
-        if (userId == null) return null;
-        // Use hashCode to convert UUID string to Long
-        // This ensures same UUID always maps to same Long
-        return Math.abs((long) userId.hashCode());
-    }
-
-    /**
-     * Ensure PharmaCompany record exists for the manufacturer user
-     * Creates one if it doesn't exist
+     * Get or create PharmaCompany for the manufacturer user
+     * Returns the PharmaCompany ID
      */
     private Long ensurePharmaCompanyExists(ManufacturerUser user) {
-        Long manufacturerId = convertUserIdToManufacturerId(user.getId());
+        // First try to find by manufacturerUserId
+        PharmaCompany pharmaCompany = pharmaCompanyRepository.findByManufacturerUserId(user.getId())
+                .orElse(null);
         
-        // Check if PharmaCompany already exists
-        if (!pharmaCompanyRepository.existsById(manufacturerId)) {
-            // Create new PharmaCompany record
-            PharmaCompany pharmaCompany = new PharmaCompany();
-            pharmaCompany.setId(manufacturerId);
-            pharmaCompany.setName(user.getCompanyName() != null ? user.getCompanyName() : user.getName());
-            pharmaCompany.setCompanyType(PharmaCompany.CompanyType.MANUFACTURER); // Required field
-            pharmaCompany.setAddress(user.getCompanyAddress());
-            pharmaCompany.setEmail(user.getEmail());
-            pharmaCompany.setLicenseNumber(user.getLicenseNumber());
-            pharmaCompany.setWalletAddress(user.getWalletAddress());
-            pharmaCompany.setManufacturerUserId(user.getId());
-            pharmaCompany.setStatus("ACTIVE");
-            
-            pharmaCompanyRepository.save(pharmaCompany);
-            log.info("Created PharmaCompany record for manufacturer: {} with ID: {}", user.getName(), manufacturerId);
+        if (pharmaCompany != null) {
+            return pharmaCompany.getId();
         }
         
-        return manufacturerId;
+        // If not found, try to find by name match
+        List<PharmaCompany> companies = pharmaCompanyRepository.findAll();
+        for (PharmaCompany company : companies) {
+            if (user.getCompanyName() != null && 
+                (company.getName().toLowerCase().contains(user.getCompanyName().toLowerCase()) ||
+                 user.getCompanyName().toLowerCase().contains(company.getName().toLowerCase()))) {
+                // Update the company to link with this user
+                company.setManufacturerUserId(user.getId());
+                pharmaCompanyRepository.save(company);
+                log.info("Linked PharmaCompany {} (ID: {}) to user {}", company.getName(), company.getId(), user.getId());
+                return company.getId();
+            }
+        }
+        
+        // If still not found, create new PharmaCompany (let database generate ID)
+        PharmaCompany newCompany = new PharmaCompany();
+        newCompany.setName(user.getCompanyName() != null ? user.getCompanyName() : user.getName());
+        newCompany.setCompanyType(PharmaCompany.CompanyType.MANUFACTURER);
+        newCompany.setAddress(user.getCompanyAddress());
+        newCompany.setEmail(user.getEmail());
+        newCompany.setLicenseNumber(user.getLicenseNumber());
+        newCompany.setWalletAddress(user.getWalletAddress());
+        newCompany.setManufacturerUserId(user.getId());
+        newCompany.setStatus("ACTIVE");
+        
+        PharmaCompany saved = pharmaCompanyRepository.save(newCompany);
+        log.info("Created new PharmaCompany for manufacturer: {} with ID: {}", user.getName(), saved.getId());
+        
+        return saved.getId();
     }
 }
 

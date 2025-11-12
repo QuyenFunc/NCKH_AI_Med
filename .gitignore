@@ -122,3 +122,25 @@ coverage/
 web/chatbox/data/
 *.pkl
 *.index
+
+# General additions (Custom, AI Assistant)
+node_modules/
+.cursor/
+/build/
+database_migrations/
+docs/
+# Backend temporary and debug files
+backend/*.sql
+backend/*.java
+backend/*.txt
+backend/src/main/resources/application.properties.additions.txt
+backend/pom.xml.additions.txt
+# Contract build/verification artifacts
+contracts/abi/
+contracts/verification-package/
+contracts/deployments/
+contracts/scripts/README.md
+contracts/start-node.bat
+# Lock files
+package-lock.json
+yarn.lock

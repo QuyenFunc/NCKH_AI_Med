@@ -48,6 +48,36 @@ public class DrugTraceabilityController {
         return ResponseEntity.ok(ApiResponse.success(shipment, "Tạo shipment thành công"));
     }
 
+    /**
+     * ✅ MỚI: GỬI HÀNG - Nhà sản xuất/phân phối xác nhận đã gửi hàng
+     * POST /api/blockchain/drugs/shipments/{shipmentId}/dispatch
+     */
+    @PostMapping("/shipments/{shipmentId}/dispatch")
+    public ResponseEntity<ApiResponse<ShipmentDto>> dispatchShipment(
+            @PathVariable BigInteger shipmentId,
+            @RequestParam(required = false, defaultValue = "Manufacturer Warehouse") String dispatchLocation,
+            @RequestParam(required = false, defaultValue = "") String notes) {
+        
+        log.info("Dispatching shipment: shipmentId={}, location={}, notes={}", 
+                 shipmentId, dispatchLocation, notes);
+        
+        try {
+            // Call blockchain service to dispatch shipment
+            blockchainService.dispatchShipment(shipmentId, dispatchLocation, notes).get();
+            
+            // Get updated shipment info
+            ShipmentDto shipment = drugTraceabilityService.getShipment(shipmentId);
+            
+            return ResponseEntity.ok(ApiResponse.success(shipment, "Gửi hàng thành công"));
+            
+        } catch (Exception e) {
+            log.error("Failed to dispatch shipment: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(
+                ApiResponse.error("Lỗi khi gửi hàng: " + e.getMessage(), 400)
+            );
+        }
+    }
+
     @PostMapping("/shipments/{shipmentId}/receive")
     public ResponseEntity<ApiResponse<ShipmentDto>> receiveShipment(
             @PathVariable BigInteger shipmentId) {
@@ -250,6 +280,14 @@ public class DrugTraceabilityController {
         return ResponseEntity.ok(ApiResponse.success(shipments, "Lấy danh sách lô hàng theo người nhận thành công"));
     }
 
+    @GetMapping("/shipments/sender/{senderAddress}")
+    public ResponseEntity<ApiResponse<List<ShipmentDto>>> getShipmentsBySender(
+            @PathVariable String senderAddress) {
+        log.info("Getting shipments by sender: {}", senderAddress);
+        List<ShipmentDto> shipments = drugTraceabilityService.getShipmentsBySender(senderAddress);
+        return ResponseEntity.ok(ApiResponse.success(shipments, "Lấy danh sách lô hàng theo người gửi thành công"));
+    }
+
     @GetMapping("/debug/batches")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getDebugBatches() {
         log.info("DEBUG: Getting all batches");
@@ -333,6 +371,68 @@ public class DrugTraceabilityController {
         } catch (Exception e) {
             log.error("Failed to get shipment by ID: {}", e.getMessage(), e);
             return ResponseEntity.ok(ApiResponse.error("Không tìm thấy shipment với ID: " + shipmentId, 404));
+        }
+    }
+
+    /**
+     * ✅ MỚI: Lấy lịch sử đầy đủ của shipment (tất cả checkpoints)
+     */
+    @GetMapping("/shipments/{shipmentId}/history")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getShipmentHistory(
+            @PathVariable BigInteger shipmentId) {
+        try {
+            log.info("Getting shipment history for shipmentId: {}", shipmentId);
+            List<Map<String, Object>> history = blockchainService.getShipmentHistory(shipmentId);
+            return ResponseEntity.ok(ApiResponse.success(history, "Lấy lịch sử shipment thành công"));
+        } catch (Exception e) {
+            log.error("Failed to get shipment history: {}", e.getMessage(), e);
+            return ResponseEntity.ok(ApiResponse.error("Không thể lấy lịch sử shipment: " + e.getMessage(), 500));
+        }
+    }
+    
+    /**
+     * ✅ MỚI: Lấy chi tiết shipment kèm số lượng checkpoints
+     */
+    @GetMapping("/shipments/{shipmentId}/details")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getShipmentDetails(
+            @PathVariable BigInteger shipmentId) {
+        try {
+            log.info("Getting shipment details for shipmentId: {}", shipmentId);
+            Map<String, Object> details = blockchainService.getShipmentDetails(shipmentId);
+            return ResponseEntity.ok(ApiResponse.success(details, "Lấy chi tiết shipment thành công"));
+        } catch (Exception e) {
+            log.error("Failed to get shipment details: {}", e.getMessage(), e);
+            return ResponseEntity.ok(ApiResponse.error("Không thể lấy chi tiết shipment: " + e.getMessage(), 500));
+        }
+    }
+    
+    /**
+     * ✅ MỚI: Cập nhật trạng thái shipment + thêm checkpoint
+     */
+    @PostMapping("/shipments/{shipmentId}/checkpoint")
+    public ResponseEntity<ApiResponse<String>> addShipmentCheckpoint(
+            @PathVariable BigInteger shipmentId,
+            @RequestParam Integer status,
+            @RequestParam String location,
+            @RequestParam(required = false, defaultValue = "") String notes) {
+        try {
+            log.info("Adding checkpoint for shipmentId: {}, status: {}, location: {}", 
+                     shipmentId, status, location);
+            
+            blockchainService.updateShipmentStatus(
+                shipmentId,
+                BigInteger.valueOf(status),
+                location,
+                notes
+            ).get();
+            
+            return ResponseEntity.ok(ApiResponse.success(
+                "Checkpoint added successfully",
+                "Đã thêm checkpoint thành công"
+            ));
+        } catch (Exception e) {
+            log.error("Failed to add checkpoint: {}", e.getMessage(), e);
+            return ResponseEntity.ok(ApiResponse.error("Không thể thêm checkpoint: " + e.getMessage(), 500));
         }
     }
 

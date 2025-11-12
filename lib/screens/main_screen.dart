@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'chat_screen.dart';
 import 'news_screen.dart';
-import 'qr_scanner_screen.dart';
+import 'product_verification_screen.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -17,7 +17,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const ChatScreen(),
     const NewsScreen(),
-    const QRScannerScreen(),
+    const ProductVerificationScreen(),
     const ProfileScreen(),
   ];
 

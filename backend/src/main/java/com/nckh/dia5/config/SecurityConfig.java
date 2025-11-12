@@ -74,6 +74,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/blockchain/drugs/distributors").permitAll() // Get distributors for frontend
                         .requestMatchers("/api/blockchain/drugs/stats").permitAll() // Dashboard stats
                         .requestMatchers("/api/blockchain/drugs/distributor/**").permitAll() // Distributor tracking endpoints
+                        .requestMatchers("/api/batches/**").permitAll() // Batch items management
+                        .requestMatchers("/api/product-items/**").permitAll() // Product items
+                        .requestMatchers("/api/public/verify/**").permitAll() // Public product verification
+                        .requestMatchers("/api/pharmacy/inventory/**").permitAll() // Pharmacy inventory endpoints
+                        .requestMatchers("/api/distributor/inventory/**").permitAll() // Distributor inventory endpoints
+                        .requestMatchers("/api/warehouse/**").permitAll() // Warehouse endpoints
                         .requestMatchers("/error").permitAll() // Error page
                         // All other endpoints require authentication
                         .anyRequest().authenticated());

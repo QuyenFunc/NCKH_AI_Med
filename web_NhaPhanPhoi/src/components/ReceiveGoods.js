@@ -35,23 +35,34 @@ const ReceiveGoods = () => {
     const fetchPendingShipments = async () => {
         try {
             setLoading(true);
+            setPendingShipments([]); // Set to empty array first to avoid undefined
+            
             // Use recipient address (distributor wallet) to get inbound shipments
             const recipientAddress = localStorage.getItem('walletAddress');
-            const response = await distributorService.getInboundShipments(recipientAddress);
             
-            if (response.success && response.data) {
+            if (!recipientAddress) {
+                console.warn('No wallet address found');
+                setPendingShipments([]);
+                return;
+            }
+            
+            const response = await distributorService.getInboundShipments(recipientAddress);
+            console.log('📦 Inbound shipments response:', response);
+            
+            if (response && response.success && Array.isArray(response.data)) {
                 // Filter out invalid shipments and normalize
                 const validShipments = response.data.filter(shipment => 
-                    shipment.shipmentId && shipment.shipmentId > 0
+                    shipment && (shipment.shipmentId || shipment.id)
                 );
                 const normalizedShipments = validShipments.map(shipment => normalizeShipmentData(shipment));
-                setPendingShipments(normalizedShipments);
+                setPendingShipments(normalizedShipments || []);
+                console.log('✅ Set pending shipments:', normalizedShipments.length);
             } else {
-                console.error('Failed to fetch pending shipments:', response.message);
+                console.error('Failed to fetch pending shipments:', response?.message || 'Invalid response');
                 setPendingShipments([]);
             }
         } catch (err) {
-            console.error('Error fetching pending shipments:', err);
+            console.error('❌ Error fetching pending shipments:', err);
             setError('Không thể tải danh sách shipment đang chờ. Vui lòng thử lại.');
             setPendingShipments([]);
         } finally {
@@ -70,7 +81,7 @@ const ReceiveGoods = () => {
             setError(null);
             
             // Step 1: Check if input is a shipment ID in pending list
-            const foundShipment = pendingShipments.find(
+            const foundShipment = (pendingShipments || []).find(
                 shipment => shipment.trackingCode === scanInput || 
                            shipment.id === scanInput ||
                            shipment.shipmentId === scanInput ||
@@ -470,24 +481,24 @@ const ReceiveGoods = () => {
                 <div className="pending-header">
                     <h3>
                         <Truck size={24} />
-                        Lô hàng đang chờ nhận ({pendingShipments.length})
+                        Lô hàng đang chờ nhận ({pendingShipments ? pendingShipments.length : 0})
                     </h3>
                 </div>
 
                 <div className="pending-grid">
-                    {loading && pendingShipments.length === 0 ? (
+                    {loading && (!pendingShipments || pendingShipments.length === 0) ? (
                         <div className="loading-pending">
                             <div className="loading-spinner"></div>
                             <p>Đang tải danh sách lô hàng đang chờ...</p>
                         </div>
-                    ) : pendingShipments.length === 0 ? (
+                    ) : !pendingShipments || pendingShipments.length === 0 ? (
                         <div className="no-pending">
                             <Package size={48} className="no-data-icon" />
                             <h4>Không có lô hàng nào đang chờ</h4>
                             <p>Tất cả lô hàng đã được xử lý</p>
                         </div>
                     ) : (
-                        pendingShipments.map(shipment => (
+                        (pendingShipments || []).map(shipment => (
                             <div key={shipment.id} className="pending-card">
                                 <div className="pending-header-info">
                                     <div className="shipment-id">{shipment.id}</div>

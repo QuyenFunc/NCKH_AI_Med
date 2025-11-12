@@ -121,6 +121,7 @@
     padding: 14px;
     cursor: pointer;
     transition: border-color .2s, box-shadow .2s, transform .1s;
+    position: relative;
 }
 
 .batch-card:hover {
@@ -132,6 +133,37 @@
 .batch-card.selected {
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+
+/* Expired batch styling */
+.batch-card.expired {
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+
+.batch-card.expired:hover {
+    border-color: #f87171;
+}
+
+.expired-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #ef4444;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 1;
+}
+
+.expired-text {
+    color: #dc2626 !important;
+    font-weight: 600;
 }
 
 .batch-header {
@@ -211,6 +243,7 @@
 .summary-item { display: grid; grid-template-columns: 160px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #e5e7eb; }
 .summary-item:last-child { border-bottom: none; }
 .summary-item label { color: #64748b; }
+.summary-item .blockchain-id { font-family: 'Courier New', monospace; font-weight: 600; color: #3b82f6; background: #eff6ff; padding: 4px 8px; border-radius: 4px; }
 
 /* Navigation */
 .form-navigation { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid #e5e7eb; background: #fafafa; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }

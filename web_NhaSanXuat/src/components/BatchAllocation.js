@@ -77,6 +77,7 @@ const BatchAllocation = () => {
 
           return {
             id: safeString(batch.batchNumber || batch.id),
+            batchId: safeString(batch.batchId), // Keep batchId as string for precision
             productId: batch.id || 0,
             productName: safeString(batch.drugName),
             quantity: batch.quantity || 0,

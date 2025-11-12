@@ -80,7 +80,11 @@ export const useChat = (onSessionCreated?: (sessionId: string) => void): UseChat
     }
 
     // ✅ NEW: Parse sources from JSON
-    if (backendMsg.sourcesJson) {
+    if (backendMsg.sourcesJson && 
+        typeof backendMsg.sourcesJson === 'string' && 
+        backendMsg.sourcesJson !== 'undefined' &&
+        backendMsg.sourcesJson !== 'null' &&
+        backendMsg.sourcesJson.trim() !== '') {
       try {
         const parsedSources = JSON.parse(backendMsg.sourcesJson);
         if (Array.isArray(parsedSources) && parsedSources.length > 0) {

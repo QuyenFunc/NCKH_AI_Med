@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import ReceiveGoods from './components/ReceiveGoods';
 import BatchManagement from './components/BatchManagement';
 import CreateShipment from './components/CreateShipment';
+import ExportManagement from './components/ExportManagement';
 import ShipmentTracking from './components/ShipmentTracking';
 import Reports from './components/Reports';
 import LoginScreen from './components/auth/LoginScreen';
@@ -41,6 +42,7 @@ function AuthWrapper() {
         <Route path="/receive-goods" element={<ReceiveGoods />} />
         <Route path="/batches" element={<BatchManagement />} />
         <Route path="/create-shipment" element={<CreateShipment />} />
+        <Route path="/export-management" element={<ExportManagement />} />
         <Route path="/shipments" element={<ShipmentTracking />} />
         <Route path="/reports" element={<Reports />} />
       </Routes>

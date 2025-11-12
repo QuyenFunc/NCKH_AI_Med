@@ -1,6 +1,8 @@
 package com.nckh.dia5.service;
 
 import com.nckh.dia5.dto.blockchain.DrugBatch;
+import com.nckh.dia5.util.BlockchainEncodingFixer;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -30,20 +32,16 @@ import java.util.concurrent.CompletableFuture;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class PharmaLedgerContract {
 
     private final Web3j web3j;
     private final Credentials credentials;
     private final StaticGasProvider gasProvider;
+    private final BlockchainEncodingFixer encodingFixer;
 
-    @Value("${pharmaledger.contract.address:0x5FbDB2315678afecb367f032d93F642f64180aa3}")
+    @Value("${pharmaledger.contract.address:0xc6e7DF5E7b4f2A278906862b61205850344D4e7d}")
     private String contractAddress;
-
-    public PharmaLedgerContract(Web3j web3j, Credentials credentials, StaticGasProvider gasProvider) {
-        this.web3j = web3j;
-        this.credentials = credentials;
-        this.gasProvider = gasProvider;
-    }
 
     /**
      * Tạo lô thuốc mới
@@ -59,13 +57,26 @@ public class PharmaLedgerContract {
             try {
                 log.info("🏭 Creating new drug batch: {}", drugInfo.getName());
                 
+                // Sanitize all Vietnamese text before sending to blockchain
+                String cleanName = sanitizeForBlockchain(drugInfo.getName(), "UNKNOWN");
+                String cleanActiveIngredient = sanitizeForBlockchain(drugInfo.getActiveIngredient(), "");
+                String cleanDosage = sanitizeForBlockchain(drugInfo.getDosage(), "");
+                String cleanManufacturer = sanitizeForBlockchain(drugInfo.getManufacturer(), "UNKNOWN");
+                String cleanRegistrationNumber = sanitizeForBlockchain(drugInfo.getRegistrationNumber(), "");
+                String cleanQrCode = sanitizeForBlockchain(qrCode, "UNKNOWN");
+                
+                // Log encoding fixes
+                encodingFixer.logEncodingIssues(drugInfo.getName(), cleanName, "drug_name");
+                encodingFixer.logEncodingIssues(drugInfo.getManufacturer(), cleanManufacturer, "manufacturer");
+                encodingFixer.logEncodingIssues(qrCode, cleanQrCode, "qr_code");
+                
                 // Tạo struct DrugInfo
                 DynamicStruct drugInfoStruct = new DynamicStruct(
-                    new Utf8String(drugInfo.getName()),
-                    new Utf8String(drugInfo.getActiveIngredient()),
-                    new Utf8String(drugInfo.getDosage()),
-                    new Utf8String(drugInfo.getManufacturer()),
-                    new Utf8String(drugInfo.getRegistrationNumber())
+                    new Utf8String(cleanName),
+                    new Utf8String(cleanActiveIngredient),
+                    new Utf8String(cleanDosage),
+                    new Utf8String(cleanManufacturer),
+                    new Utf8String(cleanRegistrationNumber)
                 );
                 
                 // Convert DateTime to Unix timestamp
@@ -81,7 +92,7 @@ public class PharmaLedgerContract {
                         new Uint256(quantity),
                         new Uint256(manufactureTimestamp),
                         new Uint256(expiryTimestamp),
-                        new Utf8String(qrCode)
+                        new Utf8String(cleanQrCode)
                     ),
                     Arrays.asList(new TypeReference<Uint256>() {})
                 );
@@ -126,13 +137,17 @@ public class PharmaLedgerContract {
             try {
                 log.info("🚚 Creating shipment for batch: {}", batchId);
                 
+                // Sanitize tracking number
+                String cleanTrackingNumber = sanitizeForBlockchain(trackingNumber, "TRK-0000000");
+                encodingFixer.logEncodingIssues(trackingNumber, cleanTrackingNumber, "tracking_number");
+                
                 Function function = new Function(
                     "createShipment",
                     Arrays.asList(
                         new Uint256(batchId),
                         new Address(toAddress),
                         new Uint256(quantity),
-                        new Utf8String(trackingNumber)
+                        new Utf8String(cleanTrackingNumber)
                     ),
                     Arrays.asList(new TypeReference<Uint256>() {})
                 );
@@ -213,9 +228,13 @@ public class PharmaLedgerContract {
             try {
                 log.info("🔍 Verifying QR code: {}", qrCode);
                 
+                // Sanitize QR code for verification
+                String cleanQrCode = sanitizeForBlockchain(qrCode, "UNKNOWN");
+                encodingFixer.logEncodingIssues(qrCode, cleanQrCode, "qr_code_verify");
+                
                 Function function = new Function(
                     "verifyDrug",
-                    Arrays.asList(new Utf8String(qrCode)),
+                    Arrays.asList(new Utf8String(cleanQrCode)),
                     Arrays.asList(
                         new TypeReference<Bool>() {},
                         new TypeReference<DynamicStruct>() {},
@@ -246,7 +265,7 @@ public class PharmaLedgerContract {
                 
                 log.info("✅ QR code verified successfully");
                 return DrugBatch.builder()
-                    .qrCode(qrCode)
+                    .qrCode(cleanQrCode)
                     .build();
                 
             } catch (Exception e) {
@@ -312,5 +331,19 @@ public class PharmaLedgerContract {
                 throw new RuntimeException("Failed to get batch info", e);
             }
         });
+    }
+
+    /**
+     * Sanitize Vietnamese text for blockchain
+     */
+    private String sanitizeForBlockchain(String input, String fallback) {
+        if (input == null || input.isBlank()) {
+            return fallback;
+        }
+        String cleaned = encodingFixer.cleanForBlockchain(input);
+        if (cleaned == null || cleaned.isBlank()) {
+            return fallback;
+        }
+        return cleaned;
     }
 }

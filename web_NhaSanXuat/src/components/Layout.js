@@ -15,7 +15,8 @@ import {
   Users,
   LogOut,
   ChevronDown,
-  Building2
+  Building2,
+  QrCode
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import './Layout.css';
@@ -41,6 +42,11 @@ const Layout = ({ children }) => {
       name: 'Cấp phát Lô thuốc',
       href: '/batch-allocation',
       icon: Plus
+    },
+    {
+      name: 'Quản lý Sản phẩm',
+      href: '/batch-products',
+      icon: QrCode
     },
     {
       name: 'Quản lý Xuất hàng',

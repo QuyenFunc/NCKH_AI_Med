@@ -10,9 +10,11 @@ import {
   Truck
 } from 'lucide-react';
 import pharmacyService from '../services/apiService';
+import { useAuth } from '../contexts/AuthContext';
 import './ReceiveGoods.css';
 
 const ReceiveGoods = () => {
+  const { user } = useAuth();
   const [scanInput, setScanInput] = useState('');
   const [shipmentDetails, setShipmentDetails] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -24,12 +26,99 @@ const ReceiveGoods = () => {
     fetchPendingShipments();
   }, []);
 
+  // Helper function to normalize shipment data from API
+  const normalizeShipmentData = (shipment) => {
+    if (!shipment) return null;
+
+    // Extract data from drugBatch if available
+    const batch = shipment.drugBatch || {};
+    const fromCompany = shipment.fromCompany || {};
+    const toCompany = shipment.toCompany || {};
+
+    // Build products array from batch data
+    let products = [];
+    if (batch.drugName) {
+      products = [{
+        name: batch.drugName || 'Sản phẩm',
+        batchCode: batch.batchId || batch.batchNumber || batch.batchCode || shipment.shipmentCode, // ⭐ Use blockchain batch ID
+        batchNumber: batch.batchNumber, // Batch number (BT202511102252)
+        blockchainBatchId: batch.batchId, // ⭐ CRITICAL: Blockchain batch ID for scanning
+        quantity: shipment.quantity || batch.quantity || 0,
+        expiry: batch.expiryDate || batch.expireDate,
+        manufacturer: batch.manufacturer || fromCompany.companyName || 'N/A',
+        manufactureDate: batch.manufactureTimestamp || batch.manufactureDate
+      }];
+    }
+
+    // If no batch data, try to construct from shipment items
+    if (products.length === 0 && shipment.shipmentItems && Array.isArray(shipment.shipmentItems)) {
+      products = shipment.shipmentItems.map(item => ({
+        name: item.drugName || item.name || 'Sản phẩm',
+        batchCode: item.blockchainBatchId || item.batchNumber || item.batchCode,
+        batchNumber: item.batchNumber,
+        blockchainBatchId: item.blockchainBatchId,
+        quantity: item.quantity || 0,
+        expiry: item.expiryDate || item.expireDate,
+        manufacturer: item.manufacturer || 'N/A'
+      }));
+    }
+
+    // Fallback: create at least one product entry
+    if (products.length === 0) {
+      products = [{
+        name: 'Sản phẩm',
+        batchCode: 'N/A',
+        batchNumber: shipment.shipmentCode,
+        blockchainBatchId: null,
+        quantity: shipment.quantity || 0,
+        expiry: null,
+        manufacturer: fromCompany.companyName || 'N/A'
+      }];
+    }
+
+    // Determine the correct database ID
+    // Priority: shipment.id (database primary key)
+    let databaseId = shipment.id;
+    
+    // If no ID found, try to extract from shipmentCode (format: SHIP-{id})
+    if (!databaseId && shipment.shipmentCode) {
+      const match = shipment.shipmentCode.match(/SHIP-(\d+)/);
+      if (match) {
+        databaseId = parseInt(match[1]);
+      }
+    }
+
+    return {
+      id: databaseId, // Database primary key - CRITICAL for receive operation
+      shipmentId: shipment.shipmentId, // Blockchain ID (can be null)
+      shipmentCode: shipment.shipmentCode,
+      trackingCode: shipment.trackingInfo || shipment.shipmentCode || `SHIP-${databaseId || 'N/A'}`,
+      from: fromCompany.companyName || fromCompany.pharmacyName || 'Nhà phân phối',
+      fromType: fromCompany.companyType === 'MANUFACTURER' ? 'manufacturer' : 'distributor',
+      fromAddress: shipment.fromAddress || fromCompany.walletAddress,
+      toAddress: shipment.toAddress || toCompany.walletAddress,
+      expectedDate: shipment.expectedDeliveryDate || shipment.shipmentDate || shipment.createdAt,
+      shipmentDate: shipment.shipmentDate || shipment.shipmentTimestamp,
+      totalValue: (shipment.quantity || 0) * 15000, // Estimated value
+      quantity: shipment.quantity || 0,
+      status: shipment.status,
+      driverName: shipment.driverName,
+      vehicleNumber: shipment.vehicleNumber,
+      notes: shipment.notes,
+      products: products,
+      transactionHash: shipment.transactionHash || shipment.createTxHash,
+      blockNumber: shipment.blockNumber
+    };
+  };
+
   const fetchPendingShipments = async () => {
     try {
       // Get shipments targeted to this pharmacy from API
       const response = await pharmacyService.getPendingShipments();
-      if (response.success) {
-        setPendingShipments(response.data);
+      if (response.success && Array.isArray(response.data)) {
+        // Normalize all pending shipments
+        const normalized = response.data.map(shipment => normalizeShipmentData(shipment));
+        setPendingShipments(normalized);
       } else {
         setPendingShipments([]);
       }
@@ -41,7 +130,7 @@ const ReceiveGoods = () => {
 
   const handleScan = async () => {
     if (!scanInput.trim()) {
-      setError('Vui lòng nhập mã lô hàng hoặc mã vận đơn');
+      setError('Vui lòng nhập Batch ID (mã lô)');
       return;
     }
 
@@ -49,70 +138,50 @@ const ReceiveGoods = () => {
       setLoading(true);
       setError(null);
       
-      // Step 1: Find matching shipment from pending list first
-      const foundShipment = pendingShipments.find(
-        shipment => shipment.trackingCode === scanInput || 
-                   shipment.id === scanInput ||
-                   shipment.shipmentId === scanInput
-      );
-
-      if (foundShipment) {
-        setShipmentDetails(foundShipment);
-        return;
-      }
-
-      // Step 2: Try to get shipment by ID directly (for shipment IDs)
+      const searchTerm = scanInput.trim();
+      console.log('🔍 Searching for BATCH with ID:', searchTerm);
+      
+      // ⭐ PRIMARY STRATEGY: Find shipments by BATCH ID
+      // This is the correct approach - scan batch ID to find shipments for that batch
       try {
-        const shipmentResponse = await pharmacyService.getShipmentById(scanInput);
-        if (shipmentResponse.success && shipmentResponse.data) {
-          // Verify this shipment is for our pharmacy
-          const pharmacyAddress = localStorage.getItem('walletAddress');
-          if (pharmacyAddress && 
-              shipmentResponse.data.toAddress?.toLowerCase() === pharmacyAddress.toLowerCase()) {
-            setShipmentDetails(shipmentResponse.data);
-            return;
-          } else {
-            setError('Lô hàng này không được gửi đến hiệu thuốc của bạn. Có thể là hàng giả!');
-            return;
-          }
-        }
-      } catch (shipmentError) {
-        console.log('Shipment not found by ID, trying batch lookup...');
-      }
-
-      // Step 3: Try to find shipments by batch (for batch IDs or QR codes)
-      try {
-        const shipmentsResponse = await pharmacyService.getShipmentsByBatch(scanInput);
+        console.log('🔍 Step 1: Looking up shipments by Batch ID:', searchTerm);
+        const shipmentsResponse = await pharmacyService.getShipmentsByBatch(searchTerm);
+        console.log('📦 Shipments by batch response:', shipmentsResponse);
+        
         if (shipmentsResponse.success && shipmentsResponse.data?.length > 0) {
           const pharmacyAddress = localStorage.getItem('walletAddress');
-          const myShipment = shipmentsResponse.data.find(s => 
-            s.toAddress?.toLowerCase() === pharmacyAddress?.toLowerCase() &&
-            (s.status === 'PENDING' || s.status === 'IN_TRANSIT')
-          );
+          console.log('🏥 My pharmacy address:', pharmacyAddress);
+          
+          // Find shipment sent to this pharmacy that's pending receipt
+          const myShipment = shipmentsResponse.data.find(s => {
+            const toAddr = s.toAddress || s.toCompany?.walletAddress;
+            const isForMe = toAddr?.toLowerCase() === pharmacyAddress?.toLowerCase();
+            const isPending = s.status === 'PENDING' || s.status === 'IN_TRANSIT';
+            
+            console.log(`  Shipment ${s.id}: toAddr=${toAddr}, isForMe=${isForMe}, status=${s.status}, isPending=${isPending}`);
+            return isForMe && isPending;
+          });
           
           if (myShipment) {
-            setShipmentDetails(myShipment);
+            console.log('✅ Found my shipment:', myShipment);
+            const normalized = normalizeShipmentData(myShipment);
+            console.log('✅ Normalized shipment:', normalized);
+            setShipmentDetails(normalized);
             return;
           } else {
-            setError('Không tìm thấy lô hàng nào được gửi đến hiệu thuốc của bạn với mã: ' + scanInput);
+            setError(`Không tìm thấy lô hàng nào đang chờ nhận cho hiệu thuốc của bạn với Batch ID: ${searchTerm}. Có thể đã nhận rồi hoặc chưa được gửi.`);
             return;
           }
+        } else {
+          setError(`Không tìm thấy shipment nào cho Batch ID: ${searchTerm}. Vui lòng kiểm tra lại mã lô.`);
+          return;
         }
       } catch (batchError) {
-        console.log('Batch lookup failed:', batchError.message);
+        console.error('❌ Batch lookup failed:', batchError);
+        setError('Lỗi khi tìm kiếm theo Batch ID: ' + batchError.message);
+        return;
       }
-
-      // Step 4: Final fallback - try general shipment info lookup
-      try {
-        const response = await pharmacyService.getShipmentInfo(scanInput);
-        if (response.success && response.data) {
-          setShipmentDetails(response.data);
-        } else {
-          setError('Không thể tìm thấy thông tin lô hàng với mã: ' + scanInput + '. Vui lòng kiểm tra lại mã hoặc liên hệ nhà cung cấp.');
-        }
-      } catch (apiError) {
-        setError('Không thể tìm thấy thông tin lô hàng với mã: ' + scanInput + '. Vui lòng kiểm tra lại mã hoặc liên hệ nhà cung cấp.');
-      }
+      
     } catch (err) {
       console.error('Error in handleScan:', err);
       setError('Lỗi khi tìm kiếm lô hàng: ' + err.message);
@@ -124,38 +193,83 @@ const ReceiveGoods = () => {
   const handleConfirmReceive = async () => {
     if (!shipmentDetails) return;
 
+    // Check authentication
+    if (!user || !user.walletAddress) {
+      setError('Bạn cần đăng nhập để xác nhận nhận hàng');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
+      setSuccess(null);
 
-      // Call blockchain API to confirm receipt and update ownership
-      const response = await pharmacyService.confirmReceiveGoods({
-        shipmentId: shipmentDetails.id,
+      // Log the shipment details for debugging
+      console.log('Confirming receipt for shipment:', {
+        id: shipmentDetails.id,
+        shipmentId: shipmentDetails.shipmentId,
+        shipmentCode: shipmentDetails.shipmentCode,
         trackingCode: shipmentDetails.trackingCode,
-        products: shipmentDetails.products,
-        confirmedBy: 'Pharmacy User', // Get from auth context
-        confirmationDate: new Date().toISOString(),
-        pharmacyInfo: {
-          name: 'Hiệu thuốc ABC',
-          address: '456 Đường XYZ, Quận 2, TP.HCM',
-          license: 'GPP-2024-002'
-        }
+        user: user.name,
+        walletAddress: user.walletAddress
       });
 
+      // Backend tries multiple strategies to find shipment:
+      // 1. By shipmentId (blockchain ID)
+      // 2. By database ID
+      // 3. By shipmentCode
+      // We should use the database ID first as it's most reliable
+      let shipmentIdToUse = shipmentDetails.id; // Use database ID first
+      
+      // If database ID doesn't exist, try shipmentId (blockchain)
+      if (!shipmentIdToUse && shipmentDetails.shipmentId) {
+        shipmentIdToUse = shipmentDetails.shipmentId;
+      }
+      
+      // If still no ID, try parsing from shipmentCode (SHIP-{id})
+      if (!shipmentIdToUse && shipmentDetails.shipmentCode) {
+        const codeMatch = shipmentDetails.shipmentCode.match(/SHIP-(\d+)/);
+        if (codeMatch) {
+          shipmentIdToUse = parseInt(codeMatch[1]);
+        }
+      }
+      
+      if (!shipmentIdToUse) {
+        setError('Không tìm thấy ID lô hàng hợp lệ để xác nhận nhận hàng');
+        return;
+      }
+      
+      console.log('Using shipment ID for receive:', shipmentIdToUse);
+      const response = await pharmacyService.receiveShipment(shipmentIdToUse);
+
       if (response.success) {
-        setSuccess(`Đã xác nhận nhận hàng thành công! Quyền giám sát đã được cập nhật trên blockchain. Transaction: ${response.data.transactionHash}`);
+        const txHash = response.data?.transactionHash || response.data?.blockchainTxHash || 'N/A';
+        const confirmedAt = response.data?.confirmedAt || new Date().toISOString();
+        
+        setSuccess(
+          `✅ Đã xác nhận nhận hàng thành công!\n\n` +
+          `📦 Lô hàng: ${shipmentDetails.trackingCode || shipmentDetails.id}\n` +
+          `🏥 Hiệu thuốc: ${user.name}\n` +
+          `👤 Xác nhận bởi: ${user.email}\n` +
+          `⛓️ Blockchain TX: ${txHash}\n` +
+          `📅 Thời gian: ${new Date(confirmedAt).toLocaleString('vi-VN')}\n\n` +
+          `Quyền sở hữu đã được chuyển sang hiệu thuốc trên blockchain. Hàng đã vào kho!`
+        );
         
         // Reset form
-        setScanInput('');
-        setShipmentDetails(null);
-        
-        // Refresh pending shipments
-        await fetchPendingShipments();
+        setTimeout(() => {
+          setScanInput('');
+          setShipmentDetails(null);
+          
+          // Refresh pending shipments
+          fetchPendingShipments();
+        }, 5000); // Give user time to read the success message
       } else {
-        setError(response.message || 'Không thể xác nhận nhận hàng');
+        setError(response.message || 'Không thể xác nhận nhận hàng. Vui lòng thử lại.');
       }
     } catch (err) {
-      setError('Lỗi xác nhận nhận hàng: ' + err.message);
+      console.error('Error confirming receipt:', err);
+      setError('Lỗi xác nhận nhận hàng: ' + (err.message || 'Không rõ nguyên nhân. Vui lòng kiểm tra kết nối và thử lại.'));
     } finally {
       setLoading(false);
     }
@@ -169,7 +283,20 @@ const ReceiveGoods = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('vi-VN');
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) return 'N/A';
+      return date.toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'N/A';
+    }
   };
 
   return (
@@ -201,8 +328,8 @@ const ReceiveGoods = () => {
         <div className="scanner-card">
           <div className="scanner-header">
             <QrCode size={32} />
-            <h3>Quét mã nhận hàng</h3>
-            <p>Quét mã lô hàng hoặc mã vận đơn để xác thực và nhận hàng</p>
+            <h3>Quét mã lô hàng (Batch ID)</h3>
+            <p>Quét hoặc nhập Batch ID từ blockchain để xác thực và nhận hàng. Batch ID là mã truy vết xuyên suốt chuỗi cung ứng.</p>
           </div>
 
           <div className="scanner-input">
@@ -212,7 +339,7 @@ const ReceiveGoods = () => {
                 type="text"
                 value={scanInput}
                 onChange={(e) => setScanInput(e.target.value)}
-                placeholder="Nhập hoặc quét mã lô hàng (VD: SH001, TRK123456789)"
+                placeholder="Nhập hoặc quét MÃ LÔ (Batch ID) - VD: 17627899583516139"
                 className="scan-input"
                 onKeyPress={(e) => e.key === 'Enter' && handleScan()}
               />
@@ -237,33 +364,67 @@ const ReceiveGoods = () => {
                 <Info size={24} />
                 Chi tiết lô hàng
               </h3>
-              <div className="shipment-id">ID: {shipmentDetails.id}</div>
+              <div className="shipment-id">Shipment #{shipmentDetails.id}</div>
             </div>
 
             <div className="details-content">
+              {/* ⭐ BATCH ID SECTION - MOST IMPORTANT */}
+              <div className="info-section batch-id-section">
+                <h4>🔖 Mã lô truy vết (Batch ID)</h4>
+                <div className="batch-id-display">
+                  <div className="batch-id-value">
+                    {shipmentDetails.products?.[0]?.blockchainBatchId || 'N/A'}
+                  </div>
+                  <div className="batch-number-value">
+                    Batch Number: {shipmentDetails.products?.[0]?.batchNumber || 'N/A'}
+                  </div>
+                  <p className="batch-id-note">
+                    ⭐ Mã này dùng để truy vết nguồn gốc xuyên suốt từ NSX → NPP → Hiệu thuốc
+                  </p>
+                </div>
+              </div>
+
               <div className="info-section">
                 <h4>Thông tin vận chuyển</h4>
                 <div className="info-grid">
                   <div className="info-item">
                     <span className="label">Từ:</span>
                     <span className="value">
-                      {shipmentDetails.from}
-                      <span className={`source-type ${shipmentDetails.fromType}`}>
-                        ({shipmentDetails.fromType === 'manufacturer' ? 'NSX' : 'NPP'})
-                      </span>
+                      {shipmentDetails.from || 'N/A'}
+                      {shipmentDetails.fromType && (
+                        <span className={`source-type ${shipmentDetails.fromType}`}>
+                          ({shipmentDetails.fromType === 'manufacturer' ? 'NSX' : 'NPP'})
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div className="info-item">
-                    <span className="label">Mã vận đơn:</span>
-                    <span className="value">{shipmentDetails.trackingCode}</span>
+                    <span className="label">Mã vận đơn (nội bộ):</span>
+                    <span className="value">{shipmentDetails.trackingCode || shipmentDetails.shipmentCode || 'N/A'}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="label">Ngày gửi hàng:</span>
+                    <span className="value">{formatDate(shipmentDetails.shipmentDate)}</span>
                   </div>
                   <div className="info-item">
                     <span className="label">Ngày dự kiến:</span>
                     <span className="value">{formatDate(shipmentDetails.expectedDate)}</span>
                   </div>
                   <div className="info-item">
+                    <span className="label">Số lượng:</span>
+                    <span className="value">{shipmentDetails.quantity || 0} sản phẩm</span>
+                  </div>
+                  <div className="info-item">
                     <span className="label">Tổng giá trị:</span>
-                    <span className="value highlight">{formatCurrency(shipmentDetails.totalValue)}</span>
+                    <span className="value highlight">{formatCurrency(shipmentDetails.totalValue || 0)}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="label">Trạng thái:</span>
+                    <span className="value">
+                      <span className={`status-badge status-${(shipmentDetails.status || '').toLowerCase()}`}>
+                        {shipmentDetails.status || 'PENDING'}
+                      </span>
+                    </span>
                   </div>
                   {shipmentDetails.driverName && (
                     <div className="info-item">
@@ -281,7 +442,7 @@ const ReceiveGoods = () => {
               </div>
 
               <div className="products-section">
-                <h4>Danh sách sản phẩm</h4>
+                <h4>Danh sách sản phẩm ({shipmentDetails.products?.length || 0})</h4>
                 <div className="products-table">
                   <table>
                     <thead>
@@ -295,21 +456,30 @@ const ReceiveGoods = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {shipmentDetails.products.map((product, index) => (
-                        <tr key={index}>
-                          <td className="product-name">{product.name}</td>
-                          <td className="batch-code">{product.batchCode}</td>
-                          <td className="quantity">{product.quantity.toLocaleString()} viên</td>
-                          <td className="expiry">{formatDate(product.expiry)}</td>
-                          <td className="source">{product.manufacturer || shipmentDetails.from}</td>
-                          <td className="status">
-                            <span className="status-badge status-verified">
-                              <CheckCircle size={14} />
-                              Đã xác thực
-                            </span>
+                      {shipmentDetails.products && shipmentDetails.products.length > 0 ? (
+                        shipmentDetails.products.map((product, index) => (
+                          <tr key={index}>
+                            <td className="product-name">{product.name || 'N/A'}</td>
+                            <td className="batch-code">{product.batchCode || 'N/A'}</td>
+                            <td className="quantity">{product.quantity ? product.quantity.toLocaleString() : '0'} viên</td>
+                            <td className="expiry">{product.expiry ? formatDate(product.expiry) : 'N/A'}</td>
+                            <td className="source">{product.manufacturer || shipmentDetails.from || 'N/A'}</td>
+                            <td className="status">
+                              <span className="status-badge status-verified">
+                                <CheckCircle size={14} />
+                                Đã xác thực
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                            <Package size={32} style={{ margin: '0 auto 1rem', display: 'block', opacity: 0.5 }} />
+                            Không có thông tin sản phẩm chi tiết
                           </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -379,8 +549,8 @@ const ReceiveGoods = () => {
             pendingShipments.map(shipment => (
               <div key={shipment.id} className="pending-card">
                 <div className="pending-header-info">
-                  <div className="shipment-id">{shipment.id}</div>
-                  <div className="tracking-code">{shipment.trackingCode}</div>
+                  <div className="shipment-id">Shipment #{shipment.id}</div>
+                  <div className="tracking-code">Batch ID: {shipment.products?.[0]?.batchCode || 'N/A'}</div>
                 </div>
                 <div className="pending-content">
                   <div className="from-info">
@@ -389,11 +559,14 @@ const ReceiveGoods = () => {
                       {shipment.fromType === 'manufacturer' ? 'NSX' : 'NPP'}
                     </span>
                   </div>
+                  <div className="batch-info">
+                    <strong>Mã lô:</strong> {shipment.products?.[0]?.batchCode || 'N/A'}
+                  </div>
                   <div className="expected-date">
                     Dự kiến: {formatDate(shipment.expectedDate)}
                   </div>
                   <div className="products-count">
-                    {shipment.products?.length || 0} sản phẩm
+                    {shipment.products?.[0]?.name || 'Sản phẩm'} - {shipment.quantity} viên
                   </div>
                   <div className="total-value">
                     {formatCurrency(shipment.totalValue || 0)}
@@ -402,7 +575,12 @@ const ReceiveGoods = () => {
                 <div className="pending-actions">
                   <button 
                     onClick={() => {
-                      setScanInput(shipment.trackingCode);
+                      // ⭐ Use blockchain batch ID for scanning
+                      const batchId = shipment.products?.[0]?.blockchainBatchId || 
+                                     shipment.products?.[0]?.batchCode || 
+                                     shipment.trackingCode;
+                      console.log('🔍 Auto-filling Batch ID:', batchId);
+                      setScanInput(batchId);
                       handleScan();
                     }}
                     className="btn btn-outline"

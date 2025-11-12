@@ -54,4 +54,7 @@ public interface PharmacyInventoryRepository extends JpaRepository<PharmacyInven
     // Get total retail value for pharmacy
     @Query("SELECT COALESCE(SUM(pi.availableQuantity * pi.retailPrice), 0) FROM PharmacyInventory pi WHERE pi.pharmacy.id = :pharmacyId")
     Double getTotalRetailValue(@Param("pharmacyId") Long pharmacyId);
+
+    // Find by drug batch ID (for batch consistency check)
+    List<PharmacyInventory> findByDrugBatchId(Long batchId);
 }

@@ -14,6 +14,8 @@ public interface DrugProductRepository extends JpaRepository<DrugProduct, Long> 
     java.util.List<DrugProduct> findByManufacturerIdIsNull();
 
     java.util.Optional<DrugProduct> findByIdAndManufacturerId(Long id, Long manufacturerId);
+    
+    java.util.List<DrugProduct> findByName(String name);
 }
 
 

@@ -2,6 +2,7 @@ package com.nckh.dia5.service;
 
 import com.nckh.dia5.dto.blockchain.CreateDistributorShipmentRequest;
 import com.nckh.dia5.dto.blockchain.ShipmentDto;
+import com.nckh.dia5.dto.blockchain.DrugBatchDto;
 import com.nckh.dia5.handler.ResourceNotFoundException;
 import com.nckh.dia5.model.DistributorInventory;
 import com.nckh.dia5.model.DrugBatch;
@@ -54,11 +55,26 @@ public class DistributorShipmentService {
             
             log.info("Found pharmacy: {} with wallet address: {}", pharmacy.getName(), pharmacy.getWalletAddress());
             
-            // 2. Find batch
+            // 2. Find batch - CRITICAL: Use blockchain batch ID
+            log.info("🔍 Looking for batch with blockchain batch_id: {}", request.getBatchId());
             DrugBatch batch = drugBatchRepository.findByBatchId(request.getBatchId())
                     .orElseThrow(() -> new ResourceNotFoundException("Batch", "batchId", request.getBatchId().toString()));
             
-            log.info("Found batch: {} with total quantity: {}", batch.getBatchNumber(), batch.getQuantity());
+            // ⭐ LOG COMPLETE BATCH INFO
+            log.info("✅ Found batch - Database ID: {}, Blockchain Batch ID: {}, Batch Number: {}, Quantity: {}", 
+                    batch.getId(), 
+                    batch.getBatchId(), 
+                    batch.getBatchNumber(), 
+                    batch.getQuantity());
+            
+            // ⚠️ VERIFY: Blockchain batch ID matches request
+            if (!batch.getBatchId().equals(request.getBatchId())) {
+                log.error("❌ CRITICAL: Batch ID mismatch! Request: {}, Found: {}", 
+                        request.getBatchId(), batch.getBatchId());
+                throw new IllegalStateException(
+                    String.format("Batch ID không khớp! Yêu cầu: %s, Tìm thấy: %s", 
+                        request.getBatchId(), batch.getBatchId()));
+            }
             
             // 3. Verify quantity - check distributor inventory instead of batch
             // Note: We'll verify actual available quantity when calling distributorInventoryService.shipOut()
@@ -67,13 +83,32 @@ public class DistributorShipmentService {
             String distributorAddress = batch.getCurrentOwner();
             log.info("Distributor address (current owner): {}", distributorAddress);
             
-            // 5. Generate tracking number if not provided
+            // 5. Get distributor info
+            PharmaCompany distributor = pharmaCompanyRepository.findByWalletAddress(distributorAddress)
+                    .orElseThrow(() -> new ResourceNotFoundException("Distributor", "walletAddress", distributorAddress));
+            
+            // 6. Generate meaningful tracking number if not provided
             String trackingNumber = request.getTrackingNumber();
             if (trackingNumber == null || trackingNumber.trim().isEmpty()) {
-                trackingNumber = "TRK-" + System.currentTimeMillis();
+                // Format: NPP[DistributorName] gui [PharmacyName] - [DrugName] SL:[quantity] - Lo:[batchNumber]
+                // Example: "NPP ABC gui Hieu Thuoc XYZ - Paracetamol SL:100 - Lo:BATCH123"
+                String distName = removeVietnameseDiacritics(distributor.getName()).replaceAll("[^a-zA-Z0-9\\s]", "").replaceAll("\\s+", "");
+                String pharmName = removeVietnameseDiacritics(pharmacy.getName()).replaceAll("[^a-zA-Z0-9\\s]", "").replaceAll("\\s+", "");
+                String drugName = removeVietnameseDiacritics(batch.getDrugName()).replaceAll("[^a-zA-Z0-9\\s]", "").replaceAll("\\s+", "");
+                String batchNum = batch.getBatchNumber().replaceAll("[^a-zA-Z0-9]", "");
+                
+                trackingNumber = String.format("NPP %s gui %s - %s SL:%d - Lo:%s",
+                        distName.length() > 15 ? distName.substring(0, 15) : distName,
+                        pharmName.length() > 15 ? pharmName.substring(0, 15) : pharmName,
+                        drugName.length() > 20 ? drugName.substring(0, 20) : drugName,
+                        request.getQuantity(),
+                        batchNum.length() > 15 ? batchNum.substring(0, 15) : batchNum
+                );
+                
+                log.info("Generated tracking number: {}", trackingNumber);
             }
             
-            // 6. Try to create shipment on blockchain
+            // 7. Try to create shipment on blockchain with tracking number
             boolean blockchainSuccess = false;
             TransactionReceipt receipt = null;
             BigInteger shipmentId = BigInteger.valueOf(System.currentTimeMillis());
@@ -82,10 +117,12 @@ public class DistributorShipmentService {
                 receipt = blockchainService.createShipment(
                     request.getBatchId(),
                     pharmacy.getWalletAddress(),
-                    BigInteger.valueOf(request.getQuantity())
+                    BigInteger.valueOf(request.getQuantity()),
+                    trackingNumber  // Pass the meaningful tracking number
                 ).get();
                 blockchainSuccess = true;
-                log.info("Shipment created on blockchain successfully. TX: {}", receipt.getTransactionHash());
+                log.info("Shipment created on blockchain successfully. TX: {}, Tracking: {}", 
+                        receipt.getTransactionHash(), trackingNumber);
             } catch (Exception e) {
                 log.warn("Failed to create shipment on blockchain, proceeding with local save: {}", e.getMessage());
             }
@@ -120,6 +157,10 @@ public class DistributorShipmentService {
             shipment.setShipmentDate(LocalDateTime.now());
             shipment.setExpectedDeliveryDate(LocalDateTime.now().plusDays(2));
             
+            // ⭐ VERIFY: Shipment has correct batch with correct blockchain ID
+            log.info("✅ Shipment linked to batch - Database ID: {}, Blockchain Batch ID: {}", 
+                    batch.getId(), batch.getBatchId());
+            
             // 9. Build notes with additional info
             Map<String, Object> additionalInfo = new HashMap<>();
             additionalInfo.put("tracking_number", trackingNumber);
@@ -134,32 +175,37 @@ public class DistributorShipmentService {
             // Merge with existing notes (which contains blockchain data)
             shipment.setNotes(currentNotes.replace("}", ", \"shipment_info\": " + toJson(additionalInfo) + "}"));
             
-            // 10. DO NOT update batch quantity - batch quantity represents total manufactured
-            // Individual inventories (distributor_inventory, pharmacy_inventory) track actual quantities
-            // batch.setQuantity(batch.getQuantity() - request.getQuantity());
-            // drugBatchRepository.save(batch);
+            // 10. ✅ Update batch quantity - giảm số lượng khi xuất kho
+            // Khi xuất kho thì phải giảm quantity trong drug_batches
+            // drug_batches.quantity là source of truth từ blockchain
+            if (batch.getQuantity() < request.getQuantity()) {
+                throw new IllegalStateException("Không đủ số lượng trong kho. Có sẵn: " + batch.getQuantity());
+            }
             
-            // 11. Update distributor inventory (reduce quantity) if exists
-            // NOTE: If distributor doesn't have inventory record, we allow shipment anyway
-            // This handles the case where distributor receives batch directly from blockchain
+            Long oldQuantity = batch.getQuantity();
+            batch.setQuantity(batch.getQuantity() - request.getQuantity());
+            drugBatchRepository.save(batch);
+            log.info("✅ Reduced drug_batches quantity from {} to {}", oldQuantity, batch.getQuantity());
+            
+            // 11. Update distributor inventory (KHÔNG giảm quantity, chỉ ghi log)
+            // Vì drug_batches đã giảm rồi, distributor_inventory chỉ là bản sao
+            // Nếu giảm cả 2 sẽ bị trừ 2 lần
             Long distributorId = pharmaCompanyRepository.findByWalletAddress(distributorAddress)
                     .map(PharmaCompany::getId)
                     .orElse(null);
             
             if (distributorId != null) {
-                // Try to ship out from inventory - this will check available quantity
-                DistributorInventory inventoryResult = distributorInventoryService.shipOut(
-                    distributorId, batch.getId(), request.getQuantity().intValue());
+                // Chỉ check xem có inventory record không, KHÔNG giảm quantity
+                DistributorInventory inventory = distributorInventoryService
+                    .getInventoryByDistributorAndBatch(distributorId, batch.getId());
                 
-                if (inventoryResult != null) {
-                    log.info("Distributor inventory updated successfully");
+                if (inventory != null) {
+                    log.info("✅ Distributor inventory exists (id={}), drug_batches already updated", inventory.getId());
                 } else {
-                    // No inventory record - just log and continue
-                    // The shipment can proceed (batch ownership verification already done via current_owner)
-                    log.info("No distributor inventory record - proceeding with shipment (batch owned directly)");
+                    log.info("ℹ️ No distributor inventory record - batch owned directly from blockchain");
                 }
             } else {
-                log.warn("Could not find distributor with wallet address: {}", distributorAddress);
+                log.warn("⚠️ Could not find distributor with wallet address: {}", distributorAddress);
             }
             
             // 12. Save shipment
@@ -189,6 +235,28 @@ public class DistributorShipmentService {
     }
 
     private ShipmentDto convertToDto(Shipment shipment, DrugBatch batch, PharmaCompany pharmacy) {
+        // ⭐ Convert batch to DTO to include blockchain batch ID
+        DrugBatchDto batchDto = null;
+        if (batch != null) {
+            batchDto = DrugBatchDto.builder()
+                    .id(batch.getId())
+                    .batchId(batch.getBatchId()) // ⭐ CRITICAL: Blockchain batch ID
+                    .batchNumber(batch.getBatchNumber())
+                    .drugName(batch.getDrugName())
+                    .manufacturer(batch.getManufacturer())
+                    .quantity(batch.getQuantity())
+                    .manufactureTimestamp(batch.getManufactureTimestamp())
+                    .expiryDate(batch.getExpiryDate())
+                    .currentOwner(batch.getCurrentOwner())
+                    .status(batch.getStatus() != null ? batch.getStatus().name() : null)
+                    .qrCode(batch.getQrCode())
+                    .storageConditions(batch.getStorageConditions())
+                    .transactionHash(batch.getTransactionHash())
+                    .build();
+            
+            log.info("📦 Including batch in DTO - Blockchain Batch ID: {}", batch.getBatchId());
+        }
+        
         return ShipmentDto.builder()
                 .id(shipment.getId())
                 .shipmentCode(shipment.getShipmentCode())
@@ -204,6 +272,7 @@ public class DistributorShipmentService {
                 .isSynced(shipment.getIsSynced())
                 .createdAt(shipment.getCreatedAt())
                 .updatedAt(shipment.getUpdatedAt())
+                .drugBatch(batchDto) // ⭐ CRITICAL: Include full batch info with blockchain ID
                 .build();
     }
 
@@ -219,5 +288,33 @@ public class DistributorShipmentService {
         }
         json.append("}");
         return json.toString();
+    }
+    
+    /**
+     * Remove Vietnamese diacritics for blockchain storage
+     */
+    private String removeVietnameseDiacritics(String str) {
+        if (str == null) return "";
+        
+        String result = str;
+        // Lowercase
+        result = result.replaceAll("[àáạảãâầấậẩẫăằắặẳẵ]", "a");
+        result = result.replaceAll("[èéẹẻẽêềếệểễ]", "e");
+        result = result.replaceAll("[ìíịỉĩ]", "i");
+        result = result.replaceAll("[òóọỏõôồốộổỗơờớợởỡ]", "o");
+        result = result.replaceAll("[ùúụủũưừứựửữ]", "u");
+        result = result.replaceAll("[ỳýỵỷỹ]", "y");
+        result = result.replaceAll("đ", "d");
+        
+        // Uppercase
+        result = result.replaceAll("[ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ]", "A");
+        result = result.replaceAll("[ÈÉẸẺẼÊỀẾỆỂỄ]", "E");
+        result = result.replaceAll("[ÌÍỊỈĨ]", "I");
+        result = result.replaceAll("[ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ]", "O");
+        result = result.replaceAll("[ÙÚỤỦŨƯỪỨỰỬỮ]", "U");
+        result = result.replaceAll("[ỲÝỴỶỸ]", "Y");
+        result = result.replaceAll("Đ", "D");
+        
+        return result;
     }
 }

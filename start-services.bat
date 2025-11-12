@@ -39,7 +39,7 @@ echo • Web Nha Phan Phoi: http://localhost:3002
 echo • Web Hieu Thuoc: http://localhost:3003
 echo • Web Nguoi Dung: http://localhost:3004
 echo.
-echo BlockScout Explorer: http://localhost:26000
+echo BlockScout Explorer: http://localhost:3000
 echo.
 echo Press any key to exit...
 pause
