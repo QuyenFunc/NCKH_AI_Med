@@ -144,6 +144,30 @@ public class PharmacyInventoryService {
         return inventoryRepository.findByPharmacyIdAndIsOnSaleTrue(pharmacyId);
     }
 
+    @Transactional
+    public void recordSaleForBatch(DrugBatch batch) {
+        if (batch == null || batch.getCurrentOwner() == null) {
+            return;
+        }
+
+        inventoryRepository.findFirstByDrugBatchAndCurrentOwnerAddress(batch, batch.getCurrentOwner())
+                .ifPresent(inventory -> {
+                    Integer currentQuantity = inventory.getQuantity();
+                    if (currentQuantity != null && currentQuantity > 0) {
+                        inventory.setQuantity(currentQuantity - 1);
+                    }
+
+                    Integer soldQuantity = inventory.getSoldQuantity() != null ? inventory.getSoldQuantity() : 0;
+                    inventory.setSoldQuantity(soldQuantity + 1);
+                    LocalDateTime now = LocalDateTime.now();
+                    if (inventory.getFirstSaleDate() == null) {
+                        inventory.setFirstSaleDate(now);
+                    }
+                    inventory.setLastSaleDate(now);
+                    inventoryRepository.save(inventory);
+                });
+    }
+
     /**
      * Add or update inventory when receiving shipment
      */

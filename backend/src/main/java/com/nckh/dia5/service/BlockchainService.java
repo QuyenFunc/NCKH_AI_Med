@@ -1,6 +1,7 @@
 package com.nckh.dia5.service;
 
 import com.nckh.dia5.config.BlockchainConfig;
+import com.nckh.dia5.dto.blockchain.SerialNumberStatusDto;
 import com.nckh.dia5.util.BlockchainEncodingFixer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import org.web3j.tx.TransactionManager;
 
 import java.math.BigInteger;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j
@@ -42,6 +44,9 @@ public class BlockchainService {
     private static final String RECEIVE_SHIPMENT_FUNCTION = "receiveShipment";
     private static final String UPDATE_BATCH_STATUS_FUNCTION = "updateBatchStatus";
     private static final String VERIFY_OWNERSHIP_FUNCTION = "verifyOwnership";
+    private static final String REGISTER_SERIALS_FUNCTION = "registerSerialNumbers";
+    private static final String REDEEM_SERIAL_FUNCTION = "redeemSerialNumber";
+    private static final String GET_SERIAL_STATUS_FUNCTION = "getSerialNumberStatus";
 
     // Event signatures
     private static final String BATCH_ISSUED_EVENT = "BatchIssued(uint256,address,string,uint256,string)";
@@ -117,6 +122,46 @@ public class BlockchainService {
         });
     }
 
+    public CompletableFuture<TransactionReceipt> registerSerialNumbers(
+            BigInteger batchId,
+            List<String> serialNumbers) {
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                if (credentials == null) {
+                    throw new IllegalStateException("Blockchain credentials not available");
+                }
+
+                if (serialNumbers == null || serialNumbers.isEmpty()) {
+                    throw new IllegalArgumentException("Serial number list is empty");
+                }
+
+                log.info("Registering {} serial numbers for batch {}", serialNumbers.size(), batchId);
+
+                List<Utf8String> serialTypes = serialNumbers.stream()
+                        .map(serial -> new Utf8String(sanitizeForBlockchain(serial, serial)))
+                        .collect(Collectors.toList());
+
+                Function function = new Function(
+                        REGISTER_SERIALS_FUNCTION,
+                        Arrays.asList(
+                                new Uint256(batchId),
+                                new DynamicArray<>(Utf8String.class, serialTypes)
+                        ),
+                        Collections.emptyList()
+                );
+
+                TransactionReceipt receipt = executeTransaction(function);
+                log.info("Serial numbers registered successfully. Transaction hash: {}", receipt.getTransactionHash());
+                return receipt;
+
+            } catch (Exception e) {
+                log.error("Failed to register serial numbers", e);
+                throw new RuntimeException("Failed to register serial numbers", e);
+            }
+        });
+    }
+
     /**
      * Create a shipment on the blockchain
      */
@@ -166,6 +211,93 @@ public class BlockchainService {
             } catch (Exception e) {
                 log.error("Failed to create shipment on blockchain", e);
                 throw new RuntimeException("Failed to create shipment on blockchain", e);
+            }
+        });
+    }
+
+    public CompletableFuture<TransactionReceipt> redeemSerialNumber(
+            BigInteger batchId,
+            String serialNumber) {
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                if (credentials == null) {
+                    throw new IllegalStateException("Blockchain credentials not available");
+                }
+
+                String sanitizedSerial = sanitizeForBlockchain(serialNumber, serialNumber);
+                log.info("Redeeming serial {} for batch {}", sanitizedSerial, batchId);
+
+                Function function = new Function(
+                        REDEEM_SERIAL_FUNCTION,
+                        Arrays.asList(
+                                new Uint256(batchId),
+                                new Utf8String(sanitizedSerial)
+                        ),
+                        Collections.emptyList()
+                );
+
+                TransactionReceipt receipt = executeTransaction(function);
+                log.info("Serial redeemed successfully. Transaction hash: {}", receipt.getTransactionHash());
+                return receipt;
+
+            } catch (Exception e) {
+                log.error("Failed to redeem serial number", e);
+                throw new RuntimeException("Failed to redeem serial number", e);
+            }
+        });
+    }
+
+    public CompletableFuture<SerialNumberStatusDto> getSerialStatus(
+            BigInteger batchId,
+            String serialNumber) {
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                String sanitizedSerial = sanitizeForBlockchain(serialNumber, serialNumber);
+
+                Function function = new Function(
+                        GET_SERIAL_STATUS_FUNCTION,
+                        Arrays.asList(
+                                new Uint256(batchId),
+                                new Utf8String(sanitizedSerial)
+                        ),
+                        Arrays.asList(
+                                new TypeReference<Bool>() {},
+                                new TypeReference<Bool>() {},
+                                new TypeReference<Uint256>() {},
+                                new TypeReference<Address>() {}
+                        )
+                );
+
+                List<Type> result = executeCall(function);
+
+                if (result.isEmpty()) {
+                    return SerialNumberStatusDto.builder()
+                            .exists(false)
+                            .redeemed(false)
+                            .redeemedAt(0L)
+                            .redeemedBy(null)
+                            .build();
+                }
+
+                boolean exists = ((Bool) result.get(0)).getValue();
+                boolean redeemed = ((Bool) result.get(1)).getValue();
+                BigInteger redeemedAtValue = ((Uint256) result.get(2)).getValue();
+                String redeemedBy = ((Address) result.get(3)).getValue();
+
+                long redeemedAt = redeemedAtValue != null ? redeemedAtValue.longValue() : 0L;
+
+                return SerialNumberStatusDto.builder()
+                        .exists(exists)
+                        .redeemed(redeemed)
+                        .redeemedAt(redeemedAt)
+                        .redeemedBy(redeemedBy)
+                        .build();
+
+            } catch (Exception e) {
+                log.error("Failed to get serial status from blockchain", e);
+                throw new RuntimeException("Failed to get serial status", e);
             }
         });
     }
@@ -696,12 +828,17 @@ public class BlockchainService {
         }
 
         String encodedFunction = FunctionEncoder.encode(function);
+        String fromAddress = credentials != null ? credentials.getAddress() : null;
         EthCall response = web3j.ethCall(
-                Transaction.createEthCallTransaction(credentials.getAddress(), contractAddress, encodedFunction),
+                Transaction.createEthCallTransaction(fromAddress, contractAddress, encodedFunction),
                 DefaultBlockParameterName.LATEST
         ).send();
 
         return FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
+    }
+
+    public String getCallerAddress() {
+        return credentials != null ? credentials.getAddress() : null;
     }
 
     /**

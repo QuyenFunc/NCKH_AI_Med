@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 
 describe("PharmaLedger", function () {
   // Fixture để deploy contract và setup initial state
@@ -199,6 +200,147 @@ describe("PharmaLedger", function () {
           qrCode
         )
       ).to.be.revertedWith("Invalid expiry date");
+    });
+  });
+
+  describe("Serial number tracking", function () {
+    it("Should allow manufacturer to register serial numbers", async function () {
+      const { pharmaLedger, manufacturer } = await loadFixture(deployPharmaLedgerFixture);
+
+      const drugInfo = {
+        name: "Paracetamol",
+        activeIngredient: "Acetaminophen",
+        dosage: "500mg",
+        manufacturer: "ABC Pharma",
+        registrationNumber: "REG123456"
+      };
+
+      const quantity = 5;
+      const manufactureDate = Math.floor(Date.now() / 1000);
+      const expiryDate = manufactureDate + (365 * 24 * 60 * 60);
+      const qrCode = "QR-SERIAL-REGISTER";
+
+      await pharmaLedger.connect(manufacturer).issueBatch(
+        drugInfo,
+        quantity,
+        manufactureDate,
+        expiryDate,
+        qrCode
+      );
+
+      const serials = ["SERIAL-001", "SERIAL-002", "SERIAL-003"];
+
+      await expect(
+        pharmaLedger.connect(manufacturer).registerSerialNumbers(1, serials)
+      ).to.emit(pharmaLedger, "SerialNumbersRegistered")
+        .withArgs(1, serials.length);
+
+      const batch = await pharmaLedger.batches(1);
+      expect(batch.registeredSerials).to.equal(serials.length);
+
+      const status = await pharmaLedger.getSerialNumberStatus(1, serials[0]);
+      expect(status[0]).to.equal(true); // exists
+      expect(status[1]).to.equal(false); // redeemed
+
+      // Cannot register the same serial twice
+      await expect(
+        pharmaLedger.connect(manufacturer).registerSerialNumbers(1, [serials[0]])
+      ).to.be.revertedWith("Serial already registered");
+
+      // Cannot register beyond quantity
+      await expect(
+        pharmaLedger.connect(manufacturer).registerSerialNumbers(1, ["SERIAL-004", "SERIAL-005", "SERIAL-006"])
+      ).to.be.revertedWith("Exceeds batch quantity");
+    });
+
+    it("Should allow pharmacy owner to redeem serial numbers", async function () {
+      const { pharmaLedger, manufacturer, pharmacy } = await loadFixture(deployPharmaLedgerFixture);
+
+      const drugInfo = {
+        name: "Amoxicillin",
+        activeIngredient: "Amoxicillin",
+        dosage: "250mg",
+        manufacturer: "MedPharm",
+        registrationNumber: "REG654321"
+      };
+
+      const quantity = 2;
+      const manufactureDate = Math.floor(Date.now() / 1000);
+      const expiryDate = manufactureDate + (365 * 24 * 60 * 60);
+      const qrCode = "QR-REDEEM-TEST";
+
+      await pharmaLedger.connect(manufacturer).issueBatch(
+        drugInfo,
+        quantity,
+        manufactureDate,
+        expiryDate,
+        qrCode
+      );
+
+      await pharmaLedger.connect(manufacturer).registerSerialNumbers(1, ["SERIAL-100", "SERIAL-101"]);
+
+      // Transfer ownership to pharmacy through shipment flow
+      await pharmaLedger.connect(manufacturer).createShipment(1, pharmacy.address, quantity, "TRACK-1");
+      await pharmaLedger.connect(pharmacy).receiveShipment(1);
+
+      await expect(
+        pharmaLedger.connect(pharmacy).redeemSerialNumber(1, "SERIAL-100")
+      ).to.emit(pharmaLedger, "SerialNumberRedeemed")
+        .withArgs(1, "SERIAL-100", pharmacy.address, anyValue);
+
+      const status = await pharmaLedger.getSerialNumberStatus(1, "SERIAL-100");
+      expect(status[0]).to.equal(true);
+      expect(status[1]).to.equal(true);
+      expect(status[3]).to.equal(pharmacy.address);
+
+      const batch = await pharmaLedger.batches(1);
+      expect(batch.redeemedSerials).to.equal(1);
+
+      // Prevent double redemption
+      await expect(
+        pharmaLedger.connect(pharmacy).redeemSerialNumber(1, "SERIAL-100")
+      ).to.be.revertedWith("Serial already redeemed");
+    });
+
+    it("Should prevent unauthorized redemption", async function () {
+      const { pharmaLedger, manufacturer, pharmacy, user } = await loadFixture(deployPharmaLedgerFixture);
+
+      const drugInfo = {
+        name: "Ibuprofen",
+        activeIngredient: "Ibuprofen",
+        dosage: "200mg",
+        manufacturer: "HealthCorp",
+        registrationNumber: "REG777777"
+      };
+
+      const quantity = 1;
+      const manufactureDate = Math.floor(Date.now() / 1000);
+      const expiryDate = manufactureDate + (365 * 24 * 60 * 60);
+      const qrCode = "QR-UNAUTHORIZED";
+
+      await pharmaLedger.connect(manufacturer).issueBatch(
+        drugInfo,
+        quantity,
+        manufactureDate,
+        expiryDate,
+        qrCode
+      );
+
+      await pharmaLedger.connect(manufacturer).registerSerialNumbers(1, ["SERIAL-500"]);
+
+      // Attempt redeem by non-pharmacy should fail
+      await expect(
+        pharmaLedger.connect(user).redeemSerialNumber(1, "SERIAL-500")
+      ).to.be.revertedWith("Caller must be pharmacy");
+
+      // Transfer to pharmacy and redeem
+      await pharmaLedger.connect(manufacturer).createShipment(1, pharmacy.address, quantity, "TRACK-2");
+      await pharmaLedger.connect(pharmacy).receiveShipment(1);
+
+      await expect(
+        pharmaLedger.connect(pharmacy).redeemSerialNumber(1, "SERIAL-500")
+      ).to.emit(pharmaLedger, "SerialNumberRedeemed")
+        .withArgs(1, "SERIAL-500", pharmacy.address, anyValue);
     });
   });
 

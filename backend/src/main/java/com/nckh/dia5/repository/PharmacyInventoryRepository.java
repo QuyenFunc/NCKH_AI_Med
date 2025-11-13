@@ -1,5 +1,6 @@
 package com.nckh.dia5.repository;
 
+import com.nckh.dia5.model.DrugBatch;
 import com.nckh.dia5.model.PharmacyInventory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -57,4 +58,6 @@ public interface PharmacyInventoryRepository extends JpaRepository<PharmacyInven
 
     // Find by drug batch ID (for batch consistency check)
     List<PharmacyInventory> findByDrugBatchId(Long batchId);
+
+    Optional<PharmacyInventory> findFirstByDrugBatchAndCurrentOwnerAddress(DrugBatch drugBatch, String currentOwnerAddress);
 }

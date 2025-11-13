@@ -94,6 +94,12 @@ public class DrugBatch {
     @Column(name = "is_synced", nullable = false)
     private Boolean isSynced = false;
 
+    @Column(name = "registered_serials")
+    private Long registeredSerials = 0L;
+
+    @Column(name = "redeemed_serials")
+    private Long redeemedSerials = 0L;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -113,6 +119,11 @@ public class DrugBatch {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     @com.fasterxml.jackson.annotation.JsonIgnore
     private List<BlockchainTransaction> transactions;
+
+    @OneToMany(mappedBy = "drugBatch", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private List<ProductItem> productItems;
 
     public enum BatchStatus {
         MANUFACTURED,

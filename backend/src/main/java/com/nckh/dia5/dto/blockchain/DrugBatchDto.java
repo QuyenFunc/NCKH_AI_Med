@@ -76,6 +76,10 @@ public class DrugBatchDto {
 
     private Boolean isSynced;
 
+    private Long registeredSerials;
+
+    private Long redeemedSerials;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
 
