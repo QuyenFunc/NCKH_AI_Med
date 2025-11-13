@@ -138,18 +138,35 @@ public class DrugTraceabilityService {
             }
 
             // AUTO-GENERATE PRODUCT ITEMS
+            List<ProductItem> generatedItems = List.of();
             try {
                 log.info("Auto-generating {} product items for batch {}", request.getQuantity(), batch.getBatchNumber());
-                productItemService.autoGenerateItemsForNewBatch(batch, request.getQuantity());
-                log.info("Successfully auto-generated product items");
+                generatedItems = productItemService.autoGenerateItemsForNewBatch(batch, request.getQuantity());
+                log.info("Successfully auto-generated {} product items", generatedItems.size());
             } catch (Exception e) {
                 log.error("Failed to auto-generate product items: {}", e.getMessage(), e);
                 // Don't fail the batch creation if item generation fails
             }
 
-            log.info("Batch created successfully: id={}, batchId={}, blockchain={}", 
+            if (!generatedItems.isEmpty()) {
+                List<String> serialNumbers = productItemService.extractSerialNumbers(generatedItems);
+                try {
+                    log.info("Registering {} serial numbers on blockchain for batch {}", serialNumbers.size(), batch.getBatchNumber());
+                    TransactionReceipt registerReceipt = blockchainService.registerSerialNumbers(batch.getBatchId(), serialNumbers)
+                            .get(20, java.util.concurrent.TimeUnit.SECONDS);
+                    productItemService.markItemsRegistered(generatedItems);
+                    batch.setRegisteredSerials((long) serialNumbers.size());
+                    drugBatchRepository.save(batch);
+                    recordBlockchainTransaction(registerReceipt, "registerSerialNumbers", batch, null);
+                    log.info("Serial numbers registered on blockchain successfully");
+                } catch (Exception e) {
+                    log.error("Failed to register serial numbers on blockchain: {}", e.getMessage(), e);
+                }
+            }
+
+            log.info("Batch created successfully: id={}, batchId={}, blockchain={}",
                      batch.getId(), batchId, blockchainSuccess ? "synced" : "pending");
-            
+
             DrugBatchDto dto = mapToDrugBatchDto(batch);
             log.info("=== RETURNING DTO: batchId={} ===", dto.getBatchId());
             return dto;
@@ -528,20 +545,67 @@ public class DrugTraceabilityService {
     /**
      * Verify drug authenticity by QR code
      */
-    public DrugBatchDto verifyDrug(VerifyDrugRequest request) {
+    public DrugVerificationResultDto verifyDrug(VerifyDrugRequest request) {
         try {
-            com.nckh.dia5.model.DrugBatch batch = drugBatchRepository.findByQrCode(request.getQrCode())
-                    .orElseThrow(() -> new ResourceNotFoundException("Drug batch", "qrCode", request.getQrCode()));
+            com.nckh.dia5.model.DrugBatch batch = drugBatchRepository.findByBatchId(request.getBatchId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Drug batch", "batchId", request.getBatchId().toString()));
 
-            // Verify on blockchain
-            boolean isValid = blockchainService.verifyOwnership(batch.getBatchId(), batch.getCurrentOwner()).get();
-            
-            if (!isValid) {
-                throw new IllegalStateException("Thuốc không hợp lệ hoặc đã bị giả mạo");
+            ProductItem productItem = productItemService.findByBatchAndSerial(batch, request.getSerialNumber())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product item", "serialNumber", request.getSerialNumber()));
+
+            SerialNumberStatusDto serialStatus = blockchainService.getSerialStatus(request.getBatchId(), request.getSerialNumber()).get();
+
+            if (serialStatus == null || !serialStatus.isExists()) {
+                throw new IllegalStateException("Serial number không tồn tại trên blockchain");
             }
 
-            log.info("Drug verified successfully: batchId={}, qrCode={}", batch.getBatchId(), request.getQrCode());
-            return mapToDrugBatchDto(batch);
+            if (serialStatus.isRedeemed()) {
+                productItemService.markItemRedeemed(productItem, serialStatus.getRedeemedBy(), serialStatus.getRedeemedAt());
+                throw new IllegalStateException("Mã QR đã được sử dụng");
+            }
+
+            boolean newlyRedeemed = false;
+
+            if (request.isMarkAsSold()) {
+                try {
+                    TransactionReceipt receipt = blockchainService.redeemSerialNumber(request.getBatchId(), request.getSerialNumber())
+                            .get(20, java.util.concurrent.TimeUnit.SECONDS);
+                    recordBlockchainTransaction(receipt, "redeemSerialNumber", batch, null);
+                    serialStatus = blockchainService.getSerialStatus(request.getBatchId(), request.getSerialNumber()).get();
+                    newlyRedeemed = serialStatus != null && serialStatus.isRedeemed();
+                } catch (Exception e) {
+                    log.error("Failed to redeem serial number on blockchain", e);
+                    throw new RuntimeException("Không thể đánh dấu serial đã bán: " + e.getMessage(), e);
+                }
+            }
+
+            if (newlyRedeemed && serialStatus != null && serialStatus.isRedeemed()) {
+                boolean updated = productItemService.markItemRedeemed(productItem, serialStatus.getRedeemedBy(), serialStatus.getRedeemedAt());
+                if (updated) {
+                    Long redeemedSerials = batch.getRedeemedSerials() != null ? batch.getRedeemedSerials() : 0L;
+                    batch.setRedeemedSerials(redeemedSerials + 1);
+                    if (batch.getRegisteredSerials() != null
+                            && batch.getRedeemedSerials() >= batch.getRegisteredSerials()
+                            && batch.getRegisteredSerials() > 0) {
+                        batch.setStatus(com.nckh.dia5.model.DrugBatch.BatchStatus.SOLD);
+                    }
+                    drugBatchRepository.save(batch);
+                    try {
+                        pharmacyInventoryService.recordSaleForBatch(batch);
+                    } catch (Exception e) {
+                        log.warn("Failed to update pharmacy inventory after redemption: {}", e.getMessage());
+                    }
+                }
+            }
+
+            log.info("Drug verified successfully: batchId={}, serial={}", batch.getBatchId(), request.getSerialNumber());
+
+            return DrugVerificationResultDto.builder()
+                    .batch(mapToDrugBatchDto(batch))
+                    .serialNumber(request.getSerialNumber())
+                    .serialStatus(serialStatus)
+                    .newlyRedeemed(newlyRedeemed && serialStatus != null && serialStatus.isRedeemed())
+                    .build();
 
         } catch (Exception e) {
             log.error("Failed to verify drug", e);
@@ -760,6 +824,8 @@ public class DrugTraceabilityService {
                 .transactionHash(batch.getTransactionHash())
                 .blockNumber(batch.getBlockNumber())
                 .isSynced(batch.getIsSynced())
+                .registeredSerials(batch.getRegisteredSerials())
+                .redeemedSerials(batch.getRedeemedSerials())
                 .createdAt(batch.getCreatedAt())
                 .updatedAt(batch.getUpdatedAt())
                 .build();

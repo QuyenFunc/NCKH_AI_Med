@@ -59,8 +59,17 @@ contract PharmaLedger is ERC721, ERC721URIStorage, AccessControl, Pausable {
         BatchStatus status;     // Trạng thái lô hàng
         string qrCode;         // Mã QR
         bool isActive;         // Còn hoạt động
+        uint256 registeredSerials; // Số serial đã đăng ký
+        uint256 redeemedSerials;   // Số serial đã bán
     }
-    
+
+    struct SerialInfo {
+        bool exists;           // Serial đã được đăng ký hay chưa
+        bool redeemed;         // Serial đã được bán hay chưa
+        uint256 redeemedAt;    // Thời gian bán
+        address redeemedBy;    // Địa chỉ người bán
+    }
+
     struct ShipmentInfo {
         uint256 shipmentId;    // ID lô giao hàng
         uint256 batchId;       // ID lô hàng
@@ -80,7 +89,8 @@ contract PharmaLedger is ERC721, ERC721URIStorage, AccessControl, Pausable {
     mapping(address => uint256[]) public manufacturerBatches;
     mapping(address => uint256[]) public ownerBatches;
     mapping(uint256 => uint256[]) public batchShipments;
-    
+    mapping(uint256 => mapping(string => SerialInfo)) private batchSerialNumbers;
+
     // Events
     event BatchIssued(
         uint256 indexed batchId,
@@ -88,6 +98,18 @@ contract PharmaLedger is ERC721, ERC721URIStorage, AccessControl, Pausable {
         string drugName,
         uint256 quantity,
         string qrCode
+    );
+
+    event SerialNumbersRegistered(
+        uint256 indexed batchId,
+        uint256 count
+    );
+
+    event SerialNumberRedeemed(
+        uint256 indexed batchId,
+        string serialNumber,
+        address indexed redeemedBy,
+        uint256 timestamp
     );
     
     event ShipmentCreated(
@@ -167,10 +189,12 @@ contract PharmaLedger is ERC721, ERC721URIStorage, AccessControl, Pausable {
         newBatch.status = BatchStatus.MANUFACTURED;
         newBatch.qrCode = _qrCode;
         newBatch.isActive = true;
-        
+        newBatch.registeredSerials = 0;
+        newBatch.redeemedSerials = 0;
+
         // Map QR code to batch ID
         qrCodeToBatchId[_qrCode] = newBatchId;
-        
+
         // Track manufacturer batches
         manufacturerBatches[msg.sender].push(newBatchId);
         ownerBatches[msg.sender].push(newBatchId);
@@ -220,7 +244,50 @@ contract PharmaLedger is ERC721, ERC721URIStorage, AccessControl, Pausable {
         
         return newShipmentId;
     }
-    
+
+    /**
+     * @dev Đăng ký danh sách serial cho lô hàng
+     */
+    function registerSerialNumbers(
+        uint256 _batchId,
+        string[] calldata _serialNumbers
+    ) external batchExists(_batchId) whenNotPaused {
+        require(_serialNumbers.length > 0, "Serial list empty");
+
+        BatchInfo storage batch = batches[_batchId];
+
+        bool isAdmin = hasRole(ADMIN_ROLE, msg.sender);
+        require(
+            isAdmin || (hasRole(MANUFACTURER_ROLE, msg.sender) && batch.manufacturer == msg.sender),
+            "Not authorized"
+        );
+
+        require(
+            batch.registeredSerials + _serialNumbers.length <= batch.quantity,
+            "Exceeds batch quantity"
+        );
+
+        uint256 newlyRegistered = 0;
+
+        for (uint256 i = 0; i < _serialNumbers.length; i++) {
+            string calldata serial = _serialNumbers[i];
+            SerialInfo storage info = batchSerialNumbers[_batchId][serial];
+            require(!info.exists, "Serial already registered");
+
+            info.exists = true;
+            info.redeemed = false;
+            info.redeemedAt = 0;
+            info.redeemedBy = address(0);
+
+            newlyRegistered++;
+        }
+
+        if (newlyRegistered > 0) {
+            batch.registeredSerials += newlyRegistered;
+            emit SerialNumbersRegistered(_batchId, newlyRegistered);
+        }
+    }
+
     /**
      * @dev Nhận lô hàng
      */
@@ -252,7 +319,36 @@ contract PharmaLedger is ERC721, ERC721URIStorage, AccessControl, Pausable {
         emit ShipmentReceived(_shipmentId, batchId, msg.sender, block.timestamp);
         emit OwnershipTransferred(batchId, previousOwner, msg.sender);
     }
-    
+
+    /**
+     * @dev Đánh dấu serial đã bán
+     */
+    function redeemSerialNumber(
+        uint256 _batchId,
+        string calldata _serialNumber
+    ) external batchExists(_batchId) whenNotPaused {
+        BatchInfo storage batch = batches[_batchId];
+        require(batch.registeredSerials > 0, "No serials registered");
+
+        SerialInfo storage info = batchSerialNumbers[_batchId][_serialNumber];
+        require(info.exists, "Serial not registered");
+        require(!info.redeemed, "Serial already redeemed");
+
+        bool isAdmin = hasRole(ADMIN_ROLE, msg.sender);
+        if (!isAdmin) {
+            require(hasRole(PHARMACY_ROLE, msg.sender), "Caller must be pharmacy");
+            require(batch.currentOwner == msg.sender, "Not batch owner");
+        }
+
+        info.redeemed = true;
+        info.redeemedAt = block.timestamp;
+        info.redeemedBy = msg.sender;
+
+        batch.redeemedSerials += 1;
+
+        emit SerialNumberRedeemed(_batchId, _serialNumber, msg.sender, block.timestamp);
+    }
+
     /**
      * @dev Xác thực lô hàng bằng QR code (public view function)
      */
@@ -289,6 +385,22 @@ contract PharmaLedger is ERC721, ERC721URIStorage, AccessControl, Pausable {
         }
         
         return (true, batch, "Valid drug batch");
+    }
+
+    /**
+     * @dev Lấy trạng thái serial
+     */
+    function getSerialNumberStatus(
+        uint256 _batchId,
+        string calldata _serialNumber
+    ) external view returns (
+        bool exists,
+        bool redeemed,
+        uint256 redeemedAt,
+        address redeemedBy
+    ) {
+        SerialInfo storage info = batchSerialNumbers[_batchId][_serialNumber];
+        return (info.exists, info.redeemed, info.redeemedAt, info.redeemedBy);
     }
     
     /**

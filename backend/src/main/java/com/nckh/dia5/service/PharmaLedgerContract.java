@@ -231,9 +231,9 @@ public class PharmaLedgerContract {
                 // Sanitize QR code for verification
                 String cleanQrCode = sanitizeForBlockchain(qrCode, "UNKNOWN");
                 encodingFixer.logEncodingIssues(qrCode, cleanQrCode, "qr_code_verify");
-                
+
                 Function function = new Function(
-                    "verifyDrug",
+                    "verifyByQRCode",
                     Arrays.asList(new Utf8String(cleanQrCode)),
                     Arrays.asList(
                         new TypeReference<Bool>() {},

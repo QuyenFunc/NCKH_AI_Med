@@ -112,12 +112,15 @@ public class DrugTraceabilityController {
         log.info("Verifying drug with QR code: {}", request.getQrCode());
         
         try {
-            DrugBatchDto batch = drugTraceabilityService.verifyDrug(request);
-            
+            DrugVerificationResultDto verificationResult = drugTraceabilityService.verifyDrug(request);
+            DrugBatchDto batch = verificationResult.getBatch();
+
             // Build verification response for Flutter app
             Map<String, Object> response = new HashMap<>();
             response.put("isValid", true);
-            
+            response.put("serialNumber", verificationResult.getSerialNumber());
+            response.put("newlyRedeemed", verificationResult.isNewlyRedeemed());
+
             // Drug info
             Map<String, Object> drugInfo = new HashMap<>();
             drugInfo.put("name", batch.getDrugName());
@@ -125,7 +128,17 @@ public class DrugTraceabilityController {
             drugInfo.put("batchNumber", batch.getBatchNumber());
             drugInfo.put("expiryDate", batch.getExpiryDate());
             response.put("drugInfo", drugInfo);
-            
+
+            Map<String, Object> serialInfo = new HashMap<>();
+            if (verificationResult.getSerialStatus() != null) {
+                SerialNumberStatusDto serialStatus = verificationResult.getSerialStatus();
+                serialInfo.put("exists", serialStatus.isExists());
+                serialInfo.put("redeemed", serialStatus.isRedeemed());
+                serialInfo.put("redeemedAt", serialStatus.getRedeemedAt());
+                serialInfo.put("redeemedBy", serialStatus.getRedeemedBy());
+            }
+            response.put("serialInfo", serialInfo);
+
             // Get ownership history from shipments
             List<ShipmentDto> shipments = drugTraceabilityService.getShipmentsByBatch(batch.getBatchId());
             List<Map<String, Object>> ownershipHistory = new ArrayList<>();
@@ -152,9 +165,11 @@ public class DrugTraceabilityController {
             
             response.put("ownershipHistory", ownershipHistory);
             response.put("transactionHash", batch.getMintTransactionHash());
-            
+            response.put("registeredSerials", batch.getRegisteredSerials());
+            response.put("redeemedSerials", batch.getRedeemedSerials());
+
             return ResponseEntity.ok(ApiResponse.success(response, "Xác minh thuốc thành công"));
-            
+
         } catch (Exception e) {
             log.error("Drug verification failed: {}", e.getMessage());
             
